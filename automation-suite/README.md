@@ -1,5 +1,3 @@
-# ITFac_Batch21_Group31 - AssureByte
-
 # QA Training App - Automation Suite
 
 **Group 31 - Cucumber + Playwright**
