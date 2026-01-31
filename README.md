@@ -16,6 +16,7 @@
 ### Installation
 
 ```bash
+cd automation-suite
 npm install
 npx playwright install
 ```
