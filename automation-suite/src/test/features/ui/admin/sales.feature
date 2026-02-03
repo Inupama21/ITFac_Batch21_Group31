@@ -5,6 +5,7 @@ Feature: Sales Management - Admin Role
 
   @smoke @TC-M5-SALE-UI-001
   Scenario: Verify sales list page loads with pagination
+    Given 15 sales records exist in system
     When I navigate to Sales page
     Then I should see sales table
     And I should see pagination controls

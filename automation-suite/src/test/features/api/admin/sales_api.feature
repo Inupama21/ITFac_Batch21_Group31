@@ -94,14 +94,14 @@ Feature: Sales API - Admin Operations
 
   @api @smoke @TC-M5-SALE-API-013
   Scenario: Verify GET empty sales list returns empty array
-    Given no sales records exist in system
+    Given no sales records exist in system via API
     When I send GET request to "/sales"
     Then response status should be 200
     And response should contain empty array
 
   @api @pagination @TC-M5-SALE-API-014
   Scenario: Verify pagination with different page sizes
-    Given 25 sales records exist in system
+    Given 25 sales records exist in system via API
     When I send GET request to "/sales/page?page=0&size=5"
     Then response status should be 200
     And response should contain 5 sales records
@@ -109,17 +109,17 @@ Feature: Sales API - Admin Operations
 
   @api @sorting @TC-M5-SALE-API-015
   Scenario: Verify sorting by plant name ascending
-    Given multiple sales exist with different plant names
+    Given multiple sales exist with different plant names via API
     When I send GET request to "/sales/page?sort=plant.name,asc"
     Then response status should be 200
-    And sales should be sorted by plant name in ascending order
+    And sales should be sorted by plant name in ascending order via API
 
   @api @positive @TC-M5-SALE-API-016
   Scenario: Verify sale creation with exact stock quantity
     Given a plant exists with quantity 5
     When I send POST request to "/sales/plant/{plantId}" with quantity 5
     Then response status should be 201
-    And plant stock should be reduced to 0
+    And plant stock should be reduced to 0 via API
 
   @api @validation @TC-M5-SALE-API-017
   Scenario: Verify POST sale fails when plant has zero stock

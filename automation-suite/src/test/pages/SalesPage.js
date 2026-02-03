@@ -23,9 +23,20 @@ class SalesPage {
     
     this.paginationControls = [
       '.pagination',
+      'ul.pagination',
+      '.pagination-container',
+      '.pagination-wrapper',
+      '.pagination-controls',
       'nav[aria-label="pagination"]',
+      'nav[aria-label="Pagination"]',
       '[data-testid="pagination"]',
-      '.page-navigation'
+      '.page-navigation',
+      '.page-item',
+      '.page-link',
+      'button:has-text("Previous")',
+      'button:has-text("Next")',
+      'a:has-text("Previous")',
+      'a:has-text("Next")'
     ];
     
     this.noSalesMessage = [
@@ -36,10 +47,15 @@ class SalesPage {
     ];
     
     this.deleteButtons = [
-      'button:has-text("Delete")',
-      '.btn-delete',
+      'button[title="Delete"]',
+      'button.delete-btn',
+      'button:has(svg)',
+      'td:has-text("Actions") button',
+      'table tbody tr button',
+      '.actions button',
       '[data-action="delete"]',
-      'button[title="Delete"]'
+      'button:has-text("Delete")',
+      '.btn-delete'
     ];
     
     // Sell Plant Form Selectors
@@ -80,9 +96,11 @@ class SalesPage {
     ];
     
     this.validationError = [
-      '.invalid-feedback',
-      '.text-danger',
-      '.error-message',
+      'form .invalid-feedback',
+      'form .text-danger',
+      '.form-group .text-danger',
+      '.form-control + .text-danger',
+      'form .error-message',
       '[data-testid="error-message"]',
       '.field-error'
     ];
@@ -211,9 +229,20 @@ class SalesPage {
    */
   async isPaginationVisible() {
     try {
-      const element = await this.findElement(this.paginationControls);
-      if (!element) return false;
-      return await element.isVisible();
+      const selectors = Array.isArray(this.paginationControls)
+        ? this.paginationControls
+        : [this.paginationControls];
+
+      for (const selector of selectors) {
+        const elements = await this.page.$$(selector);
+        for (const element of elements) {
+          if (await element.isVisible()) {
+            return true;
+          }
+        }
+      }
+
+      return false;
     } catch {
       return false;
     }

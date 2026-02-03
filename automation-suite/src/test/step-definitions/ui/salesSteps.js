@@ -1,6 +1,8 @@
 const { Given, When, Then, Before, After } = require('@cucumber/cucumber');
 const { expect } = require('chai');
 const SalesPage = require('../../pages/SalesPage');
+const LoginPage = require('../../pages/LoginPage');
+const ApiHelper = require('../../utils/apiHelper');
 
 // =============================================================================
 // BEFORE/AFTER HOOKS
@@ -9,12 +11,22 @@ const SalesPage = require('../../pages/SalesPage');
 Before(async function () {
   // Initialize any test data needed
   this.testData = {};
+  this.apiHelper = new ApiHelper();
+  this.createdSaleIds = [];
 });
 
 After(async function () {
-  // Cleanup if needed
-  if (this.createdSaleIds && this.createdSaleIds.length > 0) {
-    // Clean up created sales
+  // Cleanup created sales
+  if (this.apiHelper && this.createdSaleIds && this.createdSaleIds.length > 0) {
+    console.log(`[UI Test] Cleaning up ${this.createdSaleIds.length} sales...`);
+    for (const saleId of this.createdSaleIds) {
+      try {
+        await this.apiHelper.delete(`/sales/${saleId}`);
+        console.log(`[UI Test] Deleted sale ${saleId}`);
+      } catch (error) {
+        console.warn(`[UI Test] Failed to delete sale ${saleId}:`, error.message);
+      }
+    }
   }
 });
 
@@ -82,7 +94,9 @@ When('I navigate to Sales page', async function () {
 });
 
 When('I try to navigate to {string}', async function (url) {
-  await this.page.goto(url);
+  const baseUrl = process.env.UI_BASE_URL || 'http://localhost:8080';
+  const targetUrl = url.startsWith('http') ? url : new URL(url, baseUrl).toString();
+  await this.page.goto(targetUrl);
   await this.page.waitForTimeout(2000);
 });
 
@@ -175,23 +189,169 @@ When('I click on {string} column header', async function (columnName) {
 // =============================================================================
 
 Given('no sales records exist in system', async function () {
-  // Flag for test - in real scenario might clean via API
+  // Authenticate as admin to clean up sales
+  await this.apiHelper.authenticate('admin', 'admin123');
+  
+  // Get all existing sales using pagination with large page size
+  const salesResponse = await this.apiHelper.get('/sales/page?page=0&size=1000');
+  
+  if (salesResponse.status === 200) {
+    const existingSales = salesResponse.data.content || [];
+    
+    if (existingSales.length > 0) {
+      console.log(`[UI Test] Deleting ${existingSales.length} existing sales...`);
+      for (const sale of existingSales) {
+        const deleteResponse = await this.apiHelper.delete(`/sales/${sale.id}`);
+        if (deleteResponse.status === 204 || deleteResponse.status === 200) {
+          console.log(`[UI Test] Deleted existing sale ${sale.id}`);
+        } else {
+          console.warn(`[UI Test] Failed to delete sale ${sale.id}: ${deleteResponse.status}`);
+        }
+      }
+    }
+  }
+  
   this.noSalesExpected = true;
+  console.log('[UI Test] Ensured no sales records exist in system');
 });
 
 Given('sales records exist in system', async function () {
-  // Assume sales exist in the system
+  // Authenticate as admin to create sales
+  await this.apiHelper.authenticate('admin', 'admin123');
+  
+  // Get plants to create sales from
+  const plantsResponse = await this.apiHelper.get('/plants');
+  
+  if (plantsResponse.status !== 200) {
+    throw new Error('Failed to get plants list');
+  }
+  
+  const plants = plantsResponse.data.content || plantsResponse.data;
+  
+  if (plants.length === 0) {
+    throw new Error('No plants available to create sales');
+  }
+  
+  // Ensure plant has stock
+  const plant = plants[0];
+  if (plant.quantity < 3) {
+    await this.apiHelper.put(`/plants/${plant.id}`, {
+      name: plant.name,
+      price: plant.price,
+      quantity: 10,
+      categoryId: plant.category?.id || plant.categoryId
+    });
+  }
+  
+  // Create at least 2 sales for testing
+  console.log('[UI Test] Creating sales records...');
+  for (let i = 0; i < 2; i++) {
+    const saleResponse = await this.apiHelper.post(`/sales/plant/${plant.id}?quantity=1`, {});
+    
+    if (saleResponse.status === 201 || saleResponse.status === 200) {
+      this.createdSaleIds.push(saleResponse.data.id);
+      console.log(`[UI Test] Created sale ${i + 1}/2 with ID: ${saleResponse.data.id}`);
+    }
+  }
+  
   this.salesExist = true;
+  console.log(`[UI Test] Created ${this.createdSaleIds.length} sales for testing`);
 });
 
 Given('multiple sales records exist', async function () {
-  // Assume multiple sales exist
+  // Authenticate as admin to create sales
+  await this.apiHelper.authenticate('admin', 'admin123');
+  
+  // Get plants to create sales from
+  const plantsResponse = await this.apiHelper.get('/plants');
+  
+  if (plantsResponse.status !== 200) {
+    throw new Error('Failed to get plants list');
+  }
+  
+  const plants = plantsResponse.data.content || plantsResponse.data;
+  
+  if (plants.length === 0) {
+    throw new Error('No plants available to create sales');
+  }
+  
+  // Ensure plant has stock
+  const plant = plants[0];
+  if (plant.quantity < 50) {
+    await this.apiHelper.put(`/plants/${plant.id}`, {
+      name: plant.name,
+      price: plant.price,
+      quantity: 50,
+      categoryId: plant.category?.id || plant.categoryId
+    });
+  }
+  
+  // Create enough sales to ensure pagination is visible
+  const quantities = [1, 3, 2, 5]; // Different quantities to test sorting
+  const targetSales = 12; // Default page size is 10, create more to trigger pagination
+  console.log(`[UI Test] Creating ${targetSales} sales records for pagination/sorting tests...`);
+  
+  for (let i = 0; i < targetSales; i++) {
+    const quantity = quantities[i % quantities.length];
+    const saleResponse = await this.apiHelper.post(`/sales/plant/${plant.id}?quantity=${quantity}`, {});
+    
+    if (saleResponse.status === 201 || saleResponse.status === 200) {
+      this.createdSaleIds.push(saleResponse.data.id);
+      console.log(`[UI Test] Created sale ${i + 1}/${targetSales} with quantity ${quantity}, ID: ${saleResponse.data.id}`);
+    }
+    
+    // Small delay to ensure different timestamps
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  
   this.multipleSales = true;
+  console.log(`[UI Test] Created ${this.createdSaleIds.length} sales for pagination/sorting tests`);
 });
 
 Given('multiple sales records exist with different dates', async function () {
-  // Assume sales with different dates exist
+  // Authenticate as admin to create sales
+  await this.apiHelper.authenticate('admin', 'admin123');
+  
+  // Get plants to create sales from
+  const plantsResponse = await this.apiHelper.get('/plants');
+  
+  if (plantsResponse.status !== 200) {
+    throw new Error('Failed to get plants list');
+  }
+  
+  const plants = plantsResponse.data.content || plantsResponse.data;
+  
+  if (plants.length === 0) {
+    throw new Error('No plants available to create sales');
+  }
+  
+  // Ensure plant has stock
+  const plant = plants[0];
+  if (plant.quantity < 5) {
+    await this.apiHelper.put(`/plants/${plant.id}`, {
+      name: plant.name,
+      price: plant.price,
+      quantity: 10,
+      categoryId: plant.category?.id || plant.categoryId
+    });
+  }
+  
+  // Create at least 3 sales to verify sorting
+  console.log('[UI Test] Creating sales with different dates...');
+  for (let i = 0; i < 3; i++) {
+    const saleResponse = await this.apiHelper.post(`/sales/plant/${plant.id}?quantity=1`, {});
+    
+    if (saleResponse.status === 201 || saleResponse.status === 200) {
+      this.createdSaleIds.push(saleResponse.data.id);
+      console.log(`[UI Test] Created sale ${i + 1}/3 with ID: ${saleResponse.data.id}`);
+      
+      // Small delay to ensure different timestamps
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
+  
   this.multipleSalesWithDates = true;
+  console.log(`[UI Test] Created ${this.createdSaleIds.length} sales for sorting test`);
 });
 
 Given('multiple sales exist with different plant names', async function () {
@@ -232,8 +392,47 @@ Given('a plant with price {float} exists', async function (price) {
 });
 
 Given('{int} sales records exist in system', async function (count) {
-  // Store expected count
+  // Authenticate as admin to create sales
+  await this.apiHelper.authenticate('admin', 'admin123');
+  
+  // Get plants to create sales from
+  const plantsResponse = await this.apiHelper.get('/plants');
+  
+  if (plantsResponse.status !== 200) {
+    throw new Error('Failed to get plants list');
+  }
+  
+  const plants = plantsResponse.data.content || plantsResponse.data;
+  
+  if (plants.length === 0) {
+    throw new Error('No plants available to create sales');
+  }
+  
+  // Ensure plant has stock
+  const plant = plants[0];
+  if (plant.quantity < count) {
+    await this.apiHelper.put(`/plants/${plant.id}`, {
+      name: plant.name,
+      price: plant.price,
+      quantity: count + 10,
+      categoryId: plant.category?.id || plant.categoryId
+    });
+  }
+  
+  // Create specified number of sales
+  console.log(`[UI Test] Creating ${count} sales records...`);
+  
+  for (let i = 0; i < count; i++) {
+    const saleResponse = await this.apiHelper.post(`/sales/plant/${plant.id}?quantity=1`, {});
+    
+    if (saleResponse.status === 201 || saleResponse.status === 200) {
+      this.createdSaleIds.push(saleResponse.data.id);
+      console.log(`[UI Test] Created sale ${i + 1}/${count} with ID: ${saleResponse.data.id}`);
+    }
+  }
+  
   this.expectedSalesCount = count;
+  console.log(`[UI Test] Created ${this.createdSaleIds.length} sales for pagination test`);
 });
 
 // =============================================================================
@@ -353,14 +552,25 @@ Then('I should see plant dropdown with available plants', async function () {
 // =============================================================================
 
 Then('I should see validation error {string}', async function (expectedError) {
-  if (!this.salesPage) {
-    this.salesPage = new SalesPage(this.page);
-  }
-  
   // Wait a bit for validation to appear
   await this.page.waitForTimeout(500);
   
-  const actualError = await this.salesPage.getValidationError();
+  let actualError = '';
+  
+  // Try SalesPage validation error first
+  if (!this.salesPage) {
+    this.salesPage = new SalesPage(this.page);
+  }
+  actualError = await this.salesPage.getValidationError();
+  
+  // If no error found in SalesPage, try LoginPage
+  if (!actualError || actualError.trim() === '') {
+    if (!this.loginPage) {
+      this.loginPage = new LoginPage(this.page);
+    }
+    actualError = await this.loginPage.getValidationError();
+  }
+  
   expect(
     actualError.toLowerCase(),
     `Expected error containing "${expectedError}" but got "${actualError}"`

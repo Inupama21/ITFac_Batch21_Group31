@@ -51,39 +51,79 @@ Given('I am authenticated as User', async function () {
 // =============================================================================
 
 Given('a sale exists with known ID', async function () {
-  try {
-    // First, get or create a plant
-    const plantsResponse = await this.apiHelper.get('/plants');
+  // First, get or create a plant
+  const plantsResponse = await this.apiHelper.get('/plants');
+  
+  if (plantsResponse.status !== 200) {
+    throw new Error('Failed to get plants list');
+  }
+  
+  const plants = plantsResponse.data.content || plantsResponse.data;
+  
+  if (plants.length === 0) {
+    throw new Error('No plants available in system');
+  }
+  
+  // Find a plant with stock
+  let plantWithStock = plants.find(p => p.quantity > 0);
+  
+  if (!plantWithStock) {
+    // No plant with stock found, update the first plant to have stock
+    console.log('[Test] No plants with stock found, updating first plant...');
+    const plantToUpdate = plants[0];
     
-    if (plantsResponse.status === 200) {
-      const plants = plantsResponse.data.content || plantsResponse.data;
+    // Update plant to have stock
+    const updateResponse = await this.apiHelper.put(`/plants/${plantToUpdate.id}`, {
+      name: plantToUpdate.name,
+      price: plantToUpdate.price,
+      quantity: 10,
+      categoryId: plantToUpdate.category?.id || plantToUpdate.categoryId
+    });
+    
+    if (updateResponse.status === 200) {
+      plantWithStock = updateResponse.data;
+      console.log(`[Test] Updated plant ${plantWithStock.id} to quantity 10`);
+    } else {
+      throw new Error(`Failed to update plant stock: ${updateResponse.status} - ${JSON.stringify(updateResponse.data)}`);
+    }
+  }
+  
+  // Create a sale
+  const saleEndpoint = `/sales/plant/${plantWithStock.id}?quantity=1`;
+  const saleResponse = await this.apiHelper.post(saleEndpoint, {});
+  
+  if (saleResponse.status !== 201 && saleResponse.status !== 200) {
+    throw new Error(`Failed to create sale: ${saleResponse.status} - ${JSON.stringify(saleResponse.data)}`);
+  }
+  
+  this.testSaleId = saleResponse.data.id;
+  this.testSale = saleResponse.data;
+  this.createdResources.sales.push(this.testSaleId);
+  console.log(`[Test] Created sale with ID: ${this.testSaleId}`);
+});
+
+Given('no sales records exist in system via API', async function () {
+  // Get all sales and delete them
+  const salesResponse = await this.apiHelper.get('/sales');
+  
+  if (salesResponse.status === 200) {
+    const sales = salesResponse.data.content || salesResponse.data;
+    
+    if (sales.length > 0) {
+      console.log(`[Test] Found ${sales.length} existing sales, deleting them...`);
       
-      if (plants.length > 0) {
-        const plant = plants[0];
-        
-        // Ensure plant has stock
-        if (plant.quantity > 0) {
-          // Create a sale
-          const saleResponse = await this.apiHelper.post(`/sales/plant/${plant.id}`, {
-            quantity: 1
-          });
-          
-          if (saleResponse.status === 201 || saleResponse.status === 200) {
-            this.testSaleId = saleResponse.data.id;
-            this.testSale = saleResponse.data;
-            this.createdResources.sales.push(this.testSaleId);
-            console.log(`[Test] Created sale with ID: ${this.testSaleId}`);
-          }
+      for (const sale of sales) {
+        const deleteResponse = await this.apiHelper.delete(`/sales/${sale.id}`);
+        if (deleteResponse.status === 204 || deleteResponse.status === 200) {
+          console.log(`[Test] Deleted sale ${sale.id}`);
+        } else {
+          console.warn(`[Test] Failed to delete sale ${sale.id}: ${deleteResponse.status}`);
         }
       }
     }
-  } catch (error) {
-    console.warn('[Test] Could not create test sale:', error.message);
   }
-});
-
-Given('no sales records exist in system', async function () {
-  // Flag for test - in real scenario might clean DB via API
+  
+  console.log(`[Test] Ensured no sales records exist in system`);
   this.noSalesExpected = true;
 });
 
@@ -93,14 +133,92 @@ Given('multiple sales exist in system', async function () {
   this.multipleSalesExpected = true;
 });
 
-Given('multiple sales exist with different plant names', async function () {
+Given('multiple sales exist with different plant names via API', async function () {
   // Flag for sorting tests
   this.multiplePlantsExpected = true;
 });
 
-Given('{int} sales records exist in system', async function (count) {
-  // Store expected count
+Given('{int} sales records exist in system via API', async function (count) {
+  // Get current sales using pagination with large page size
+  const currentSalesResponse = await this.apiHelper.get('/sales/page?page=0&size=1000');
+  let existingSales = [];
+  
+  if (currentSalesResponse.status === 200) {
+    existingSales = currentSalesResponse.data.content || [];
+  }
+  
+  console.log(`[Test] Found ${existingSales.length} existing sales, target: ${count}`);
+  
+  // Delete all existing sales to start fresh
+  if (existingSales.length > 0) {
+    console.log(`[Test] Deleting ${existingSales.length} existing sales...`);
+    for (const sale of existingSales) {
+      const deleteResponse = await this.apiHelper.delete(`/sales/${sale.id}`);
+      if (deleteResponse.status === 204 || deleteResponse.status === 200) {
+        console.log(`[Test] Deleted existing sale ${sale.id}`);
+      } else {
+        console.warn(`[Test] Failed to delete sale ${sale.id}: ${deleteResponse.status}`);
+      }
+    }
+  }
+  
+  // Get plants to create sales from
+  const plantsResponse = await this.apiHelper.get('/plants');
+  
+  if (plantsResponse.status !== 200) {
+    throw new Error('Failed to get plants list');
+  }
+  
+  const plants = plantsResponse.data.content || plantsResponse.data;
+  
+  if (plants.length === 0) {
+    throw new Error('No plants available to create sales');
+  }
+  
+  // Create exactly the target number of sales
+  if (count > 0) {
+    console.log(`[Test] Creating ${count} sales...`);
+    
+    for (let i = 0; i < count; i++) {
+      // Use first plant for simplicity
+      let plant = plants[0];
+      
+      // Check if plant has stock before each sale
+      if (plant.quantity <= 0) {
+        // Update plant to have sufficient stock
+        const updateResponse = await this.apiHelper.put(`/plants/${plant.id}`, {
+          name: plant.name,
+          price: plant.price,
+          quantity: 100, // Set high quantity to ensure we can create all sales
+          categoryId: plant.category?.id || plant.categoryId
+        });
+        
+        if (updateResponse.status !== 200) {
+          console.warn(`[Test] Failed to update plant stock for sale creation`);
+          continue;
+        }
+        plant = updateResponse.data;
+      }
+      
+      // Create a sale
+      const saleResponse = await this.apiHelper.post(`/sales/plant/${plant.id}?quantity=1`, {});
+      
+      if (saleResponse.status === 201 || saleResponse.status === 200) {
+        this.createdResources.sales.push(saleResponse.data.id);
+        console.log(`[Test] Created sale ${i + 1}/${count} with ID: ${saleResponse.data.id}`);
+        
+        // Update plant info for next iteration
+        if (saleResponse.data.plant) {
+          plants[0] = saleResponse.data.plant;
+        }
+      } else {
+        console.warn(`[Test] Failed to create sale ${i + 1}/${count}: ${saleResponse.status} - ${JSON.stringify(saleResponse.data)}`);
+      }
+    }
+  }
+  
   this.expectedSalesCount = count;
+  console.log(`[Test] Ensured exactly ${count} sales records exist in system`);
 });
 
 // =============================================================================
@@ -108,54 +226,98 @@ Given('{int} sales records exist in system', async function (count) {
 // =============================================================================
 
 Given('a plant exists with quantity {int}', async function (quantity) {
-  try {
-    // Try to get existing plants first
-    const plantsResponse = await this.apiHelper.get('/plants');
-    
-    if (plantsResponse.status === 200) {
-      const plants = plantsResponse.data.content || plantsResponse.data;
-      
-      // Find plant with sufficient quantity
-      const suitablePlant = plants.find(p => p.quantity >= quantity);
-      
-      if (suitablePlant) {
-        this.testPlant = suitablePlant;
-        this.testPlantId = suitablePlant.id;
-        this.initialStock = suitablePlant.quantity;
-        console.log(`[Test] Using existing plant ${this.testPlantId} with quantity ${this.initialStock}`);
-      } else if (plants.length > 0) {
-        // Use first plant if no suitable one found
-        this.testPlant = plants[0];
-        this.testPlantId = plants[0].id;
-        this.initialStock = plants[0].quantity;
-        console.log(`[Test] Using plant ${this.testPlantId} with quantity ${this.initialStock}`);
-      }
-    }
-  } catch (error) {
-    console.warn('[Test] Could not get plant:', error.message);
+  const adminHelper = new ApiHelper();
+  await adminHelper.authenticate('admin', 'admin123');
+
+  const plantsResponse = await adminHelper.get('/plants');
+  
+  if (plantsResponse.status !== 200) {
+    throw new Error('Failed to get plants list');
   }
+  
+  const plants = plantsResponse.data.content || plantsResponse.data;
+  
+  if (plants.length === 0) {
+    throw new Error('No plants available in system');
+  }
+  
+  // Find plant with exact quantity or use first plant and update it
+  let suitablePlant = plants.find(p => p.quantity === quantity);
+  
+  if (!suitablePlant) {
+    // Use first plant and update it to have exact quantity
+    suitablePlant = plants[0];
+    console.log(`[Test] Updating plant ${suitablePlant.id} to quantity ${quantity}...`);
+    
+    const updateResponse = await adminHelper.put(`/plants/${suitablePlant.id}`, {
+      name: suitablePlant.name,
+      price: suitablePlant.price,
+      quantity: quantity,
+      categoryId: suitablePlant.category?.id || suitablePlant.categoryId
+    });
+    
+    if (updateResponse.status === 200) {
+      suitablePlant = updateResponse.data;
+      console.log(`[Test] Updated plant ${suitablePlant.id} to quantity ${quantity}`);
+    } else {
+      throw new Error(`Failed to update plant quantity: ${updateResponse.status} - ${JSON.stringify(updateResponse.data)}`);
+    }
+  }
+  
+  this.testPlant = suitablePlant;
+  this.testPlantId = suitablePlant.id;
+  this.initialStock = suitablePlant.quantity;
+  console.log(`[Test] Using plant ${this.testPlantId} with quantity ${this.initialStock}`);
 });
 
 Given('a plant exists with price {float} and quantity {int}', async function (price, quantity) {
-  try {
-    const plantsResponse = await this.apiHelper.get('/plants');
-    
-    if (plantsResponse.status === 200) {
-      const plants = plantsResponse.data.content || plantsResponse.data;
-      
-      if (plants.length > 0) {
-        // Find plant with matching price or use first plant
-        const matchingPlant = plants.find(p => p.price === price);
-        this.testPlant = matchingPlant || plants[0];
-        this.testPlantId = this.testPlant.id;
-        this.initialStock = this.testPlant.quantity;
-        this.plantPrice = this.testPlant.price;
-        console.log(`[Test] Using plant ${this.testPlantId} with price ${this.plantPrice}`);
-      }
-    }
-  } catch (error) {
-    console.warn('[Test] Could not get plant:', error.message);
+  const plantsResponse = await this.apiHelper.get('/plants');
+  
+  if (plantsResponse.status !== 200) {
+    throw new Error('Failed to get plants list');
   }
+  
+  const plants = plantsResponse.data.content || plantsResponse.data;
+  
+  if (plants.length === 0) {
+    throw new Error('No plants available in system');
+  }
+  
+  // Find plant with matching price and sufficient quantity
+  let suitablePlant = plants.find(p => p.price === price && p.quantity >= quantity);
+  
+  if (!suitablePlant) {
+    // Try to find plant with matching price only
+    suitablePlant = plants.find(p => p.price === price);
+    
+    if (!suitablePlant) {
+      // Use first plant and update it
+      suitablePlant = plants[0];
+    }
+    
+    // Update plant to have required price and quantity
+    console.log(`[Test] Updating plant ${suitablePlant.id} to price ${price} and quantity ${quantity}...`);
+    
+    const updateResponse = await this.apiHelper.put(`/plants/${suitablePlant.id}`, {
+      name: suitablePlant.name,
+      price: price,
+      quantity: quantity,
+      categoryId: suitablePlant.category?.id || suitablePlant.categoryId
+    });
+    
+    if (updateResponse.status === 200) {
+      suitablePlant = updateResponse.data;
+      console.log(`[Test] Updated plant ${suitablePlant.id} to price ${price} and quantity ${quantity}`);
+    } else {
+      throw new Error(`Failed to update plant: ${updateResponse.status} - ${JSON.stringify(updateResponse.data)}`);
+    }
+  }
+  
+  this.testPlant = suitablePlant;
+  this.testPlantId = suitablePlant.id;
+  this.initialStock = suitablePlant.quantity;
+  this.plantPrice = suitablePlant.price;
+  console.log(`[Test] Using plant ${this.testPlantId} with price ${this.plantPrice} and quantity ${this.initialStock}`);
 });
 
 Given('a plant exists in system', async function () {
@@ -211,11 +373,13 @@ When('I send GET request to {string}', async function (endpoint) {
 When('I send POST request to {string} with quantity {int}', async function (endpoint, quantity) {
   // Replace placeholders
   let url = endpoint.replace('{plantId}', this.testPlantId || '999999');
+  const joiner = url.includes('?') ? '&' : '?';
+  const urlWithQuantity = `${url}${joiner}quantity=${quantity}`;
   
-  this.requestBody = { quantity: quantity };
-  console.log(`[Test] Sending POST request to: ${url} with body:`, this.requestBody);
+  this.requestBody = null;
+  console.log(`[Test] Sending POST request to: ${urlWithQuantity} with query quantity=${quantity}`);
   
-  this.response = await this.apiHelper.post(url, this.requestBody);
+  this.response = await this.apiHelper.post(urlWithQuantity, {});
   console.log(`[Test] Response status: ${this.response.status}`);
   
   if (this.response.status === 201 || this.response.status === 200) {
@@ -225,7 +389,7 @@ When('I send POST request to {string} with quantity {int}', async function (endp
     console.log(`[Test] Created sale with ID: ${this.createdSaleId}`);
   }
   
-  this.lastEndpoint = url;
+  this.lastEndpoint = urlWithQuantity;
 });
 
 When('I send DELETE request to {string}', async function (endpoint) {
@@ -414,7 +578,7 @@ Then('sales should be sorted by {string} in ascending order', function (field) {
   }
 });
 
-Then('sales should be sorted by plant name in ascending order', function () {
+Then('sales should be sorted by plant name in ascending order via API', function () {
   const salesData = this.response.data.content || this.response.data;
   
   if (salesData.length > 1) {
@@ -564,7 +728,7 @@ Then('plant stock should be reduced by sold quantity', async function () {
   }
 });
 
-Then('plant stock should be reduced to {int}', async function (expectedStock) {
+Then('plant stock should be reduced to {int} via API', async function (expectedStock) {
   if (this.testPlantId) {
     try {
       // Wait a bit for stock update

@@ -248,7 +248,7 @@ class ApiHelper {
    * @returns {Promise<Object>} - Created sale
    */
   async createSale(plantId, quantity = 1) {
-    const response = await this.post(`/sales/plant/${plantId}`, { quantity });
+    const response = await this.post(`/sales/plant/${plantId}?quantity=${quantity}`, {});
     
     if (response.status === 201 || response.status === 200) {
       console.log(`[API] Created test sale: ${response.data.id}`);
