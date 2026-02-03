@@ -5,8 +5,29 @@
   "main": "cucumber.js",
   "scripts": {
     "test": "cucumber-js",
+    "test:all": "cucumber-js src/test/features/**/*.feature",
     "test:ui": "cucumber-js src/test/features/ui/**/*.feature",
-    "test:api": "cucumber-js src/test/features/api/**/*.feature"
+    "test:api": "cucumber-js src/test/features/api/**/*.feature",
+    "test:sales": "cucumber-js src/test/features/**/sales*.feature",
+    "test:sales-ui": "cucumber-js src/test/features/ui/admin/sales.feature",
+    "test:sales-ui-user": "cucumber-js src/test/features/ui/user/sales_view.feature",
+    "test:sales-api": "cucumber-js src/test/features/api/admin/sales_api.feature",
+    "test:smoke": "cucumber-js --tags @smoke",
+    "test:validation": "cucumber-js --tags @validation",
+    "test:sorting": "cucumber-js --tags @sorting",
+    "test:access-control": "cucumber-js --tags @access-control",
+    "test:positive": "cucumber-js --tags @positive",
+    "test:negative": "cucumber-js --tags @negative",
+    "test:pagination": "cucumber-js --tags @pagination",
+    "test:admin": "cucumber-js src/test/features/ui/admin/*.feature src/test/features/api/admin/*.feature",
+    "test:user": "cucumber-js src/test/features/ui/user/*.feature",
+    "test:parallel": "cucumber-js --parallel 2",
+    "test:headed": "HEADLESS=false cucumber-js",
+    "test:debug": "DEBUG=playwright:api cucumber-js",
+    "debug:sales": "node debug-sales.js",
+    "report": "node generate-report.js",
+    "clean": "rm -rf test-results screenshots reports",
+    "setup": "npm install && npm run clean"
   },
   "keywords": [],
   "author": "",
@@ -19,5 +40,8 @@
     "chai": "^6.2.2",
     "dotenv": "^17.2.3",
     "playwright": "^1.58.0"
+  },
+  "devDependencies": {
+    "cucumber-html-reporter": "^7.2.0"
   }
 }
