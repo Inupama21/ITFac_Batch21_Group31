@@ -18,7 +18,6 @@ Given('plants exist in the system', async function () {
   this.testData.plantsExist = true;
 });
 
-
 Given('I am logged in as {string}', { timeout: 30000 }, async function (role) {
   const loginPage = new LoginPage(this.page);
   await loginPage.navigate();
@@ -33,24 +32,18 @@ Given('I am logged in as {string}', { timeout: 30000 }, async function (role) {
 
   await loginPage.clickLogin();
 
-  // Wait for the post-login page to render.  The sidebar Logout link exists on
-  // every authenticated page and is a reliable "you are logged in" signal.
   await this.page.waitForSelector('a[href="/ui/logout"]', { state: 'visible', timeout: 15000 });
   console.log(`✓ Logged in as ${role}`);
 });
 
-// After goto() we click Price to shift default sort away from Name so that
-// TC-M3-PLANT-UI-008's first click on Name produces ascending (app default
-// first-click behaviour).
+// Just load the page. Default sort is Name ASC — prices are NOT sorted.
+// clickColumnHeader() reads sortField from URL so it handles any pre-existing
+// sort state automatically — no need to pre-click anything here.
 Given('I am on the plants page', { timeout: 25000 }, async function () {
   const plantPage = new PlantPage(this.page);
   await plantPage.goto();
-  // Shift default sort to Price
-  await plantPage.clickColumnHeader('Price');
 });
 
-// goto() now waits for <table> so if we end up on a redirect/login page it
-// fails clearly.  noPlantsExist flag triggers an empty-result search.
 When('I navigate to the plants page', { timeout: 25000 }, async function () {
   const plantPage = new PlantPage(this.page);
   await plantPage.goto();
@@ -130,16 +123,14 @@ Given('multiple plants with different quantities exist', async function () {
   this.testData.differentQuantitiesExist = true;
 });
 
-// clickColumnHeader may click a "reset" column first (full page reload) then
-// the target column (another full page reload) — give it 30 s total.
+// "once" = first click via clickColumnHeader — resets if needed, then clicks → ASC
 When('I click on the {string} column header once', { timeout: 30000 }, async function (columnName) {
   const plantPage = new PlantPage(this.page);
   await plantPage.clickColumnHeader(columnName);
   this.testData.clickCount = 1;
 });
 
-// "again" = intentional toggle on the same column; click directly, no reset.
-// Sort link is a full-page nav so wait for table after.
+// "again" = intentional toggle on the already-sorted column — click directly, no reset
 When('I click on the {string} column header again', { timeout: 20000 }, async function (columnName) {
   await this.page.click(`table thead th a:has-text("${columnName}")`);
   await this.page.waitForSelector('table', { state: 'visible', timeout: 10000 });
@@ -270,7 +261,6 @@ Then('the search should be case-insensitive', async function () {
 
 Then('the message {string} should be displayed', { timeout: 15000 }, async function (message) {
   const plantPage = new PlantPage(this.page);
-  // Short wait for SSR response after the search-form submission
   await this.page.waitForTimeout(1500);
   const isVisible = await plantPage.isNoDataMessageVisible();
   expect(isVisible).toBeTruthy();

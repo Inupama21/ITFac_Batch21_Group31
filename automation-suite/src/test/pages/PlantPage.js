@@ -26,18 +26,22 @@ class PlantPage {
   }
 
   // ─── NAVIGATION ─────────────────────────────────────────────────────────────
-  // The app is fully server-side rendered (SSR) — no AJAX after page load.
-  // networkidle is wrong here; domcontentloaded is correct.
-  // We wait for the table element to confirm the plants page actually rendered
-  // (not a login redirect).
   async goto() {
     await this.page.goto('http://localhost:8080/ui/plants', {
       waitUntil: 'domcontentloaded',
       timeout: 30000,
     });
-    // Wait for the table — if session expired the server redirects to /login
-    // which has no <table>, so this will fail fast with a clear error.
     await this.page.waitForSelector('table', { state: 'visible', timeout: 10000 });
+  }
+
+  // ─── CURRENT SORT STATE (from URL) ──────────────────────────────────────────
+  async getCurrentSortState() {
+    const url = this.page.url();
+    const params = new URLSearchParams(url.split('?')[1] || '');
+    return {
+      field: params.get('sortField') || null,
+      dir: params.get('sortDir') || null,
+    };
   }
 
   // ─── SEARCH / FILTER ────────────────────────────────────────────────────────
@@ -46,29 +50,20 @@ class PlantPage {
     await this.page.fill(this.searchInput, plantName);
   }
 
-  // Actual dropdown options from HTML: "" (All Categories), "3" (Orchid), "4" (Rose).
-  // "Flowers" is the PARENT category in the API but is NOT a <option> label.
-  // Fallback chain:
-  //   1. Exact label match (works for "Orchid", "Rose", "All Categories")
-  //   2. Partial case-insensitive match on label text
-  //   3. If still nothing matches (e.g. "Flowers"), select the FIRST option
-  //      whose value is not empty (i.e. first real sub-category).
   async selectCategory(categoryName) {
     await this.page.waitForSelector(this.categoryDropdown, { state: 'visible', timeout: 10000 });
 
     try {
       await this.page.selectOption(this.categoryDropdown, { label: categoryName }, { timeout: 1500 });
-      return; // exact match worked
+      return;
     } catch {
       // fall through
     }
 
-    // Collect all options with both label and value
     const options = await this.page.locator(`${this.categoryDropdown} option`).evaluateAll(
       (els) => els.map((el) => ({ label: el.textContent.trim(), value: el.value }))
     );
 
-    // Attempt 2: partial match on label
     const partialMatch = options.find(
       (opt) => opt.label.toLowerCase().includes(categoryName.toLowerCase())
     );
@@ -77,8 +72,6 @@ class PlantPage {
       return;
     }
 
-    // Attempt 3: categoryName is a parent (e.g. "Flowers") that has no direct
-    // option — pick the first real sub-category (first option with a non-empty value)
     const firstReal = options.find((opt) => opt.value !== '');
     if (firstReal) {
       console.log(`⚠ "${categoryName}" not in dropdown; selecting first available: "${firstReal.label}"`);
@@ -89,14 +82,11 @@ class PlantPage {
     throw new Error(`No matching category found for "${categoryName}". Available: ${JSON.stringify(options)}`);
   }
 
-  // The Search button is inside a <form method="get"> — clicking it does a FULL
-  // page navigation.  Wait for the new page's table to appear before continuing.
   async clickSearchButton() {
     await this.page.click(this.searchButton);
     await this.page.waitForSelector('table', { state: 'visible', timeout: 10000 });
   }
 
-  // Reset is <a href="/ui/plants"> — full page reload.
   async clickResetButton() {
     await this.page.click(this.resetButton);
     await this.page.waitForSelector('table', { state: 'visible', timeout: 10000 });
@@ -107,37 +97,31 @@ class PlantPage {
   }
 
   // ─── COLUMN SORTING ─────────────────────────────────────────────────────────
-  // Sort headers are plain <a href="...?sortField=X&sortDir=Y"> links — clicking
-  // one does a FULL page navigation.  We must wait for the new page to render
-  // before reading data.
-  //
-  // If the target column already carries a sort arrow the app will toggle
-  // direction.  To guarantee "first click = asc" we click a different column
-  // first to clear the active sort.
-  async clickColumnHeader(columnName) {
-    const targetLocator = `table thead th a:has-text("${columnName}")`;
+ async clickColumnHeader(columnName) {
+    const fieldMap = { Name: 'name', Price: 'price', Stock: 'quantity' };
+    const targetField = fieldMap[columnName] || columnName.toLowerCase();
 
-    const headers = await this.page.locator('table thead th').allTextContents();
-    const targetHeaderText = headers.find((h) => h.includes(columnName)) || '';
-    const isAlreadySorted = targetHeaderText.includes('↑') || targetHeaderText.includes('↓');
-
-    if (isAlreadySorted) {
-      // Pick any other sortable column to clear the active sort
-      const otherColumn = headers.find(
-        (h) => !h.includes(columnName) && h.trim() !== 'Actions' && h.trim() !== 'Category' && h.trim() !== ''
-      );
-      if (otherColumn) {
-        const cleanName = otherColumn.replace(/[↑↓]/g, '').trim();
-        if (cleanName) {
-          await this.page.click(`table thead th a:has-text("${cleanName}")`);
-          // Full page reload — wait for new page
-          await this.page.waitForSelector('table', { state: 'visible', timeout: 10000 });
-        }
-      }
+    // The app defaults to name/asc even when URL has no sortField param.
+    // Normalise so clickColumnHeader knows the true current state.
+    let sortState = await this.getCurrentSortState();
+    if (!sortState.field) {
+      sortState = { field: 'name', dir: 'asc' };
     }
 
-    await this.page.click(targetLocator);
-    // Full page reload after sort link click — wait for new page
+    console.log(`clickColumnHeader("${columnName}") — effective sort: ${JSON.stringify(sortState)}`);
+
+    if (sortState.field === targetField) {
+      // Already sorted on this column — click a different column first to reset,
+      // so the next click on the target produces ASC.
+      const resetFields = Object.entries(fieldMap).filter(([, v]) => v !== targetField);
+      const [resetDisplayName] = resetFields[0];
+
+      console.log(`  resetting via "${resetDisplayName}" first`);
+      await this.page.click(`table thead th a:has-text("${resetDisplayName}")`);
+      await this.page.waitForSelector('table', { state: 'visible', timeout: 10000 });
+    }
+
+    await this.page.click(`table thead th a:has-text("${columnName}")`);
     await this.page.waitForSelector('table', { state: 'visible', timeout: 10000 });
   }
 
@@ -192,7 +176,6 @@ class PlantPage {
   async isNoDataMessageVisible() {
     const bodyText = await this.page.locator('body').textContent();
     if (bodyText.includes('No plants found')) return true;
-
     try {
       const count = await this.page.locator('text=No plants found').count();
       return count > 0;
@@ -209,8 +192,11 @@ class PlantPage {
     return await this.page.locator(this.categoryDropdown).inputValue();
   }
 
+  // ─── FIX 1: trim() every name so whitespace or stray arrow chars
+  //            (↑ / ↓) that live inside the <td> don't pollute the string.
   async getAllPlantNames() {
-    return await this.page.locator(this.plantNameColumn).allTextContents();
+    const raw = await this.page.locator(this.plantNameColumn).allTextContents();
+    return raw.map((name) => name.trim());
   }
 
   async getAllPrices() {
@@ -252,34 +238,37 @@ class PlantPage {
     return results;
   }
 
+  
   async verifySortingOrder(columnName, order = 'asc') {
-    // Page already reloaded by clickColumnHeader — no extra wait needed,
-    // but a short pause lets the DOM settle after navigation.
     await this.page.waitForSelector('table', { state: 'visible', timeout: 5000 });
 
     if (columnName.toLowerCase() === 'name') {
       const names = await this.getAllPlantNames();
       const sorted = [...names].sort((a, b) =>
-        order === 'asc' ? a.localeCompare(b) : b.localeCompare(a)
+        order === 'asc'
+          ? a.localeCompare(b, undefined, { sensitivity: 'base' })
+          : b.localeCompare(a, undefined, { sensitivity: 'base' })
       );
-      console.log('Current names:', names);
+      console.log('Current names: ', names);
       console.log('Expected sorted:', sorted);
       return JSON.stringify(names) === JSON.stringify(sorted);
+
     } else if (columnName.toLowerCase() === 'price') {
       const prices = await this.getAllPrices();
       const sorted = [...prices].sort((a, b) =>
         order === 'asc' ? a - b : b - a
       );
-      console.log('Current prices:', prices);
+      console.log('Current prices: ', prices);
       console.log('Expected sorted:', sorted);
       return JSON.stringify(prices) === JSON.stringify(sorted);
+
     } else if (columnName.toLowerCase() === 'stock' || columnName.toLowerCase() === 'quantity') {
       const quantities = await this.getAllQuantities();
       const sorted = [...quantities].sort((a, b) =>
         order === 'asc' ? a - b : b - a
       );
-      console.log('Current quantities:', quantities);
-      console.log('Expected sorted:', sorted);
+      console.log('Current quantities: ', quantities);
+      console.log('Expected sorted:   ', sorted);
       return JSON.stringify(quantities) === JSON.stringify(sorted);
     }
 
@@ -305,10 +294,6 @@ class PlantPage {
 
   async verifyAllPlantsInCategory(categoryName) {
     const categories = await this.getCategoryForAllPlants();
-    // "Flowers" is the parent — its children are "Orchid" and "Rose".
-    // If the feature passes a parent name we can't match it literally against
-    // the Category column.  Accept any row as valid in that case so the test
-    // does not false-fail on a test-data mismatch.
     const knownParents = ['flowers'];
     if (knownParents.includes(categoryName.toLowerCase())) {
       console.log(`⚠ "${categoryName}" is a parent category; skipping strict category check`);
