@@ -2,20 +2,20 @@ class PlantPage {
     constructor(page) {
         this.page = page;
 
-        /* Plants page */
         this.addPlantBtn = page.locator('button, a').filter({ hasText: /Add.*Plant/i }).first();
         this.plantRows = page.locator('table tbody tr');
 
-        /* Add Plant page */
-        /* Add Plant page */
         this.nameInput = page.locator('#name');
         this.categoryDropdown = page.locator('#categoryId');
         this.priceInput = page.locator('#price');
         this.quantityInput = page.locator('#quantity');
         this.saveButton = page.locator('button', { hasText: /save/i });
 
-        /* Validation */
         this.priceError = page.locator('text=Price must be greater than 0');
+
+        this.tableEditButton = page.locator('table tbody tr:first-child .bi-pencil-square, table tbody tr:first-child button:has-text("Edit")').first();
+        this.tableDeleteButton = page.locator('table tbody tr:first-child .bi-trash, table tbody tr:first-child button:has-text("Delete")').first();
+        this.successMessage = page.locator('text=Plant deleted successfully');
     }
 
     async gotoPlantsPage() {
@@ -60,6 +60,44 @@ class PlantPage {
     async getCategoryOptions() {
         await this.categoryDropdown.waitFor({ state: 'visible' });
         return await this.categoryDropdown.locator('option').allInnerTexts();
+    }
+
+    async clickEditPlantButton() {
+        await this.plantRows.first().waitFor();
+        await this.tableEditButton.click();
+    }
+
+    async getPlantNameValue() {
+        await this.nameInput.waitFor({ state: 'visible' });
+        return await this.nameInput.inputValue();
+    }
+
+    async getPlantPriceValue() {
+        await this.priceInput.waitFor({ state: 'visible' });
+        return await this.priceInput.inputValue();
+    }
+
+    async getPlantQuantityValue() {
+        await this.quantityInput.waitFor({ state: 'visible' });
+        return await this.quantityInput.inputValue();
+    }
+    async clickDeletePlantButton() {
+        await this.plantRows.first().waitFor();
+
+        this.page.once('dialog', async dialog => {
+            await dialog.accept();
+        });
+
+        await this.tableDeleteButton.click();
+    }
+
+    async getSuccessMessageText() {
+        await this.successMessage.waitFor({ state: 'visible', timeout: 5000 });
+        return await this.successMessage.textContent();
+    }
+
+    async getPlantCount() {
+        return await this.plantRows.count();
     }
 }
 
