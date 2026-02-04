@@ -15,8 +15,8 @@ Feature: Category UI Management
 
   @TC-M2-CAT-UI-002
   Scenario: Verify Admin can add a category with valid name
-    When I add a new category with name "PlantNew4"
-    Then the category "PlantNew4" should be visible in the category list
+    When I add a new category with name "Plants00"
+    Then the category "Plants00" should be visible in the category list
 
   @TC-M2-CAT-UI-003
   Scenario: Verify error when Category Name is empty
