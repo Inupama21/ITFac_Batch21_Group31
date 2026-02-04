@@ -23,11 +23,11 @@ When('I click login button', async function () {
 });
 
 When('I leave username field empty', async function () {
-  // Do nothing - field remains empty
+
 });
 
 When('I leave password field empty', async function () {
-  // Do nothing - field remains empty
+
 });
 
 Then('I should see the dashboard page', async function () {

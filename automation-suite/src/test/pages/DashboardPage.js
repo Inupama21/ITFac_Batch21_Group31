@@ -1,7 +1,7 @@
 class DashboardPage {
   constructor(page) {
     this.page = page;
-    this.dashboardTitle = 'h2';  // "🌸 QA Training Application"
+    this.dashboardTitle = 'h2';  
     this.manageCategoriesBtn = page.locator('text=Manage Categories');
   }
 
