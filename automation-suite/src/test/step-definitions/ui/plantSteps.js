@@ -65,3 +65,26 @@ Then('plant should not be added to the plants table', async function () {
 Then('admin should stay on the add plant page', async function () {
     expect(this.page.url()).to.include('/ui/plants/add');
 });
+
+When('admin click the sub category dropdown it should show only the sub categories not the main categories', async function () {
+    const options = await this.plantPage.getCategoryOptions();
+
+    // Expected sub-categories (should be present)
+    const expectedSubCategories = ['Culinary', 'Fruit'];
+
+    // Main categories (should NOT be present)
+    const mainCategories = ['Trees', 'Herbs', 'Grasses'];
+
+    // Filter out empty or "Select" options if necessary
+    const actualOptions = options.map(opt => opt.trim()).filter(opt => opt.length > 0 && opt !== 'Select Category');
+
+    // Verify sub-categories are present
+    for (const subCat of expectedSubCategories) {
+        expect(actualOptions).to.include(subCat, `Expected sub-category "${subCat}" to be present`);
+    }
+
+    // Verify main categories are NOT present
+    for (const mainCat of mainCategories) {
+        expect(actualOptions).to.not.include(mainCat, `Main category "${mainCat}" should NOT be present`);
+    }
+});
