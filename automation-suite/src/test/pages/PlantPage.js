@@ -56,6 +56,11 @@ class PlantPage {
         const rows = await this.plantRows.allTextContents();
         return rows.some(row => row.includes(name));
     }
+
+    async getCategoryOptions() {
+        await this.categoryDropdown.waitFor({ state: 'visible' });
+        return await this.categoryDropdown.locator('option').allInnerTexts();
+    }
 }
 
 module.exports = PlantPage;
