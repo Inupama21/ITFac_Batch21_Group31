@@ -1,14 +1,18 @@
 class DashboardPage {
   constructor(page) {
     this.page = page;
-    
     this.dashboardTitle = 'h2';  // "🌸 QA Training Application"
+    this.manageCategoriesBtn = page.locator('text=Manage Categories');
   }
 
   async isOnDashboard() {
     await this.page.waitForTimeout(1000);
     const url = this.page.url();
     return url.includes('http://localhost:8080/ui/dashboard');
+  }
+
+async clickManageCategories() {
+    await this.manageCategoriesBtn.click();
   }
 
   async getWelcomeMessage() {

@@ -1,7 +1,7 @@
 const { Given, When, Then, setDefaultTimeout } = require('@cucumber/cucumber');
 const { expect } = require('chai');
 const LoginPage = require('../../pages/LoginPage');
-const DashboardPage = require('../../pages/DashBoardPage');
+const DashboardPage = require('../../pages/DashboardPage');
 
 setDefaultTimeout(10000);
 
