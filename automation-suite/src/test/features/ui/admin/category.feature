@@ -1,0 +1,34 @@
+@ui @categories
+Feature: Category UI Management
+  As an Admin
+  I want to manage categories
+  So that I can add new categories and validate errors for invalid inputs
+
+  Background:
+    Given I am logged in as an "Admin"
+    And I navigate to the Categories page
+
+  @TC-M2-CAT-UI-001
+  Scenario: Verify Admin can access Add Category page
+    When I click on the "Add A Category" button
+    Then the Add Category page should be displayed
+
+  @TC-M2-CAT-UI-002
+  Scenario: Verify Admin can add a category with valid name
+    When I add a new category with name "PlantNew4"
+    Then the category "PlantNew4" should be visible in the category list
+
+  @TC-M2-CAT-UI-003
+  Scenario: Verify error when Category Name is empty
+    When I click "Add A Category" but save without typing a name
+    Then I should see a validation error "Category name is required"
+
+  @TC-M2-CAT-UI-004
+  Scenario: Verify error when Category Name length is less than 3
+    When I add a new category with name "AB"
+    Then I should see a validation error "Category name must be between 3 and 10 characters"
+
+  @TC-M2-CAT-UI-005
+  Scenario: Verify error when Category Name length is more than 10
+    When I add a new category with name "PlantsExtraLongName"
+    Then I should see a validation error "Category name must be between 3 and 10 characters"
