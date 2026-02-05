@@ -105,6 +105,83 @@ class PlantPage {
     async getPlantCount() {
         return await this.plantRows.count();
     }
+
+    async isTableDisplayed() {
+        return await this.plantRows.first().isVisible();
+    }
+
+    async getTableHeaders() {
+        return await this.page.locator('table thead th').allInnerTexts();
+    }
+
+    async isEditButtonVisible() {
+        // Wait for the table to be visible first to ensure page is loaded
+        await this.plantRows.first().waitFor();
+        return await this.tableEditButton.isVisible();
+    }
+
+    async isDeleteButtonVisible() {
+        // Wait for the table to be visible first to ensure page is loaded
+        await this.plantRows.first().waitFor();
+        return await this.tableDeleteButton.isVisible();
+    }
+
+    async isAddPlantButtonVisible() {
+        // The button might effectively be hidden by not being in the DOM or being invisible
+        return await this.addPlantBtn.isVisible();
+    }
+
+    async clickPlantNameInTable() {
+        await this.plantRows.first().waitFor();
+        // Assuming the name is in the first column
+        await this.plantRows.first().locator('td').first().click();
+    }
+
+    async isEditModalDisplayed() {
+        // Checking if the add/edit form inputs become visible or a modal appears
+        // Using nameInput as a proxy for the edit form being open
+        try {
+            return await this.nameInput.isVisible({ timeout: 2000 });
+        } catch (e) {
+            return false;
+        }
+    }
+
+    async clickPriceCell() {
+         await this.plantRows.first().waitFor();
+         // Assuming Price is the 3rd column based on typical layouts, strictly we'd find by header index but this is a quick implementation
+         // Using text search for '$' or similar might be safer, but let's try 3rd column first or finding a cell with a number
+         // Better: find cell that contains the price value we might expect, or just the 3rd cell.
+         // Let's assume standard columns: Name, Category, Price, Quantity
+         await this.plantRows.first().locator('td').nth(2).click();
+    }
+
+    async isPriceCellEditable() {
+        // Check if the clicked cell turned into an input or has an input child
+        // AND check if the main form price input appeared (if it's a modal edit)
+        const cellInput = this.plantRows.first().locator('td').nth(2).locator('input');
+        if (await cellInput.count() > 0 && await cellInput.isVisible()) return true;
+        
+        // Also check main price input if it popped up (modal case)
+        if (await this.priceInput.isVisible()) return true;
+
+        return false;
+    }
+
+    async rightClickPlantRow() {
+        await this.plantRows.first().waitFor();
+        await this.plantRows.first().click({ button: 'right' });
+    }
+
+    async isContextMenuDisplayed() {
+        // Check for common context menu indicators
+        const contextMenu = this.page.locator('.context-menu, .dropdown-menu, [role="menu"]');
+        try {
+           return await contextMenu.first().isVisible({ timeout: 2000 });
+        } catch (e) {
+            return false;
+        }
+    }
 }
 
 module.exports = PlantPage;
