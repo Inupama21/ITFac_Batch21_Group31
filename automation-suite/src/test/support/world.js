@@ -17,10 +17,12 @@ class CustomWorld {
 
 setWorldConstructor(CustomWorld);
 
+// Before each scenario
 Before(async function () {
   await this.openBrowser();
 });
 
+// After each scenario
 After(async function () {
   await this.closeBrowser();
 });
