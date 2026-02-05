@@ -154,3 +154,72 @@ Then('the successful message {string} should be displayed', async function (expe
     const actualMessage = await this.plantPage.getSuccessMessageText();
     expect(actualMessage).to.include(expectedMessage);
 });
+
+/* ---------- User Steps ---------- */
+
+Given('User is logged in', async function () {
+    this.loginPage = new LoginPage(this.page);
+    await this.loginPage.navigate();
+    await this.loginPage.enterUsername('testuser');
+    await this.loginPage.enterPassword('test123');
+    await this.loginPage.clickLogin();
+
+    this.dashboardPage = new DashboardPage(this.page);
+    // Assuming user also lands on dashboard, or we might need to adjust expectation
+    expect(await this.dashboardPage.isOnDashboard()).to.be.true;
+});
+
+Given('User is on the Plants page', async function () {
+    this.plantPage = new PlantPage(this.page);
+    await this.plantPage.gotoPlantsPage();
+});
+
+Then('the user can view all the plants data in the table', async function () {
+    const isTableVisible = await this.plantPage.isTableDisplayed();
+    expect(isTableVisible).to.be.true;
+    
+    // const headers = await this.plantPage.getTableHeaders();
+    // expect(headers).to.include('Name'); // Example check
+});
+
+Then('the edit button should not visible in the plants table actions column', async function () {
+    const isVisible = await this.plantPage.isEditButtonVisible();
+    expect(isVisible).to.be.false;
+});
+
+Then('the delete button should not visible in the plants table actions column', async function () {
+    const isVisible = await this.plantPage.isDeleteButtonVisible();
+    expect(isVisible).to.be.false;
+});
+
+    Then('the "Add a Plant" button should not visible in the plants page', async function () {
+    const isVisible = await this.plantPage.isAddPlantButtonVisible();
+    expect(isVisible).to.be.false;
+});
+
+When('User attempts to click on plant name in table', async function () {
+    await this.plantPage.clickPlantNameInTable();
+});
+
+Then('no edit modal or form should open', async function () {
+    const isDisplayed = await this.plantPage.isEditModalDisplayed();
+    expect(isDisplayed).to.be.false;
+});
+
+When('User attempts to click on price field', async function () {
+    await this.plantPage.clickPriceCell();
+});
+
+Then('the price field should not be editable', async function () {
+    const isEditable = await this.plantPage.isPriceCellEditable();
+    expect(isEditable).to.be.false;
+});
+
+When('User right-clicks on plant row', async function () {
+    await this.plantPage.rightClickPlantRow();
+});
+
+Then('no context menu with edit or delete options should appear', async function () {
+    const isDisplayed = await this.plantPage.isContextMenuDisplayed();
+    expect(isDisplayed).to.be.false;
+});
