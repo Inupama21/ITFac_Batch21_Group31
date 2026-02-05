@@ -5,8 +5,8 @@ class LoginPage {
     this.usernameInput = 'input[name="username"]';
     this.passwordInput = 'input[name="password"]';
     this.loginButton = 'button[type="submit"]';
-    this.errorMessage = '.alert-danger';  // For invalid login errors
-    this.validationError = '.invalid-feedback';  // For validation errors (empty fields)
+    this.errorMessage = '.alert-danger';  
+    this.validationError = '.invalid-feedback'; 
   }
 
   async navigate() {
@@ -42,10 +42,8 @@ class LoginPage {
 
   async getValidationError() {
     try {
-      // Find all validation error elements
       const elements = await this.page.$$(this.validationError);
       
-      // Get text from all visible validation errors
       const texts = [];
       for (const element of elements) {
         const isVisible = await element.isVisible();
@@ -57,7 +55,7 @@ class LoginPage {
         }
       }
       
-      // Return first non-empty validation error
+
       return texts.length > 0 ? texts[0] : '';
     } catch (error) {
       return '';

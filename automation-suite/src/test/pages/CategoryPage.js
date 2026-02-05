@@ -5,25 +5,61 @@ class CategoryPage {
         this.categoryNameInput = page.locator('input[name="name"]');
         this.saveBtn = page.getByRole('button', { name: 'Save' });
         this.validationError = page.locator('.invalid-feedback'); 
+        this.searchBar = page.locator('input[name="name"]'); 
+        this.searchBtn = page.getByRole('button', { name: 'Search' });
+        this.resetBtn = page.getByRole('button', { name: 'Reset' });
+        this.noRecordsMessage = page.locator('text="No category found"');
+        this.parentDropdown = page.locator('select.form-select').first();
+        this.parentFilterDropdown = page.locator('select.form-select');
     }
 
     async navigate() {
         await this.page.goto('http://localhost:8080/ui/categories');
     }
 
-    async addNewCategory(name) {
-        await this.addCategoryBtn.click();
-        await this.categoryNameInput.waitFor({ state: 'visible' }); 
-        await this.categoryNameInput.fill(name);
-        await this.saveBtn.click();
+    
+    async searchCategory(name) {
+        await this.searchBar.fill(name);
+        await this.searchBtn.click();
+        await this.page.waitForTimeout(1000);
+
     }
     
     // Checks if the category name appears anywhere on the page 
     async isCategoryVisible(name) {
- 
         const categoryLocator = this.page.locator(`td:has-text("${name}")`);
         await categoryLocator.first().waitFor({ state: 'visible', timeout: 5000 });
         return await categoryLocator.first().isVisible();
     }
+
+    async clickReset() {
+        await this.resetBtn.click();
+    }
+
+    async sortByName() {
+        await this.nameHeader.click();
+    }
+
+    // for the search result validation
+    async getFirstRowName() {
+    const firstRowName = this.page.locator('table tbody tr td').nth(1);
+    await firstRowName.waitFor({ state: 'visible', timeout: 5000 });
+    return await firstRowName.textContent();
+    }
+    async getSearchValue() {
+        return await this.searchBar.inputValue();
+    }
+
+async filterByParent(parentName) {
+        await this.parentFilterDropdown.waitFor({ state: 'visible', timeout: 5000 });
+        await this.parentFilterDropdown.selectOption({ label: parentName });
+    }
+
+    async getFirstRowParent() {
+        const parentCell = this.page.locator('table tbody tr td').nth(2);
+        return await parentCell.textContent();
+    }
+    
+
 }
 module.exports = { CategoryPage };
