@@ -52,6 +52,12 @@ class PlantPage {
         return await this.priceError.textContent();
     }
 
+    async isErrorMessageDisplayed(message) {
+        const errorLocator = this.page.locator(`text=${message}`);
+        await errorLocator.waitFor({ state: 'visible', timeout: 10000 });
+        return await errorLocator.isVisible();
+    }
+
     async isPlantPresent(name) {
         const rows = await this.plantRows.allTextContents();
         return rows.some(row => row.includes(name));
@@ -92,7 +98,7 @@ class PlantPage {
     }
 
     async getSuccessMessageText() {
-        await this.successMessage.waitFor({ state: 'visible', timeout: 5000 });
+        await this.successMessage.waitFor({ state: 'visible', timeout: 10000 });
         return await this.successMessage.textContent();
     }
 
