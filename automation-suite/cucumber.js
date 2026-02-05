@@ -1,8 +1,19 @@
+const path = require('path');
+
 module.exports = {
   default: {
-    require: ['src/test/step-definitions/**/*.js', 'src/test/support/**/*.js'],
+    require: [
+      path.join(__dirname, 'src/test/step-definitions/**/*.js'),
+      path.join(__dirname, 'src/test/support/**/*.js')
+    ],
+    paths: [
+      path.join(__dirname, 'src/test/features/ui/**/*.feature'),
+      path.join(__dirname, 'src/test/features/api/**/*.feature')
+    ],
     format: ['progress', 'html:reports/cucumber-report.html'],
     parallel: 2,
-    publishQuiet: true
+    publishQuiet: true,
+    retry: 0,
+    strict: true
   }
 };

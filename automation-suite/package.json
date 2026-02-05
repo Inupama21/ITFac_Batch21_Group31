@@ -19,5 +19,9 @@
     "chai": "^4.5.0",
     "dotenv": "^17.2.3",
     "playwright": "^1.58.0"
+  },
+  "devDependencies": {
+    "@wdio/allure-reporter": "^9.23.3",
+    "cucumber-html-reporter": "^7.2.0"
   }
 }
