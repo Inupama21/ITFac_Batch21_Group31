@@ -24,10 +24,22 @@ Feature: Add Plant Form Validation
     And admin clicks edit button of any plant
     Then admin should see the edit plant page with pre-populated data
 
-  Scenario: Verify plant deletion from UI
+  Scenario: Verify plant deletion from UI - TC-M4-PLANT-UI-004
     Given admin is logged in
     And admin is on the Plants page
     And admin clicks delete button of any plant
     And admin click ok to the popup from the brower
     Then the plant should remove from the table
     And the successful message "Plant deleted successfully" should be displayed
+
+  Scenario: Verify required field validation in Add Plant form
+    Given admin is logged in
+    And admin is on the Plants page
+    And admin clicks Add a Plant button
+    Then admin should see the Add Plant page
+    And admin clicks save button 
+    Then the error message "Plant name is required" should be displayed
+    And the error message "Plant name must be between 3 and 25 characters" should be displayed
+    And the error message "Category is required" should be displayed
+    And the error message "Price is required" should be displayed
+    And the error message "Quantity is required" should be displayed
