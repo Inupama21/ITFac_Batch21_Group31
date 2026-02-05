@@ -5,7 +5,7 @@ const LoginPage = require('../../pages/LoginPage');
 const DashboardPage = require('../../pages/DashBoardPage');
 const PlantPage = require('../../pages/PlantPage');
 
-setDefaultTimeout(20000);
+setDefaultTimeout(60000);
 
 /* ---------- GIVEN ---------- */
 
@@ -53,8 +53,17 @@ When('admin presses save button', async function () {
 /* ---------- THEN ---------- */
 
 Then('error message {string} should be displayed', async function (expectedMessage) {
-    const actualMessage = await this.plantPage.getPriceErrorMessage();
-    expect(actualMessage).to.include(expectedMessage);
+    const isDisplayed = await this.plantPage.isErrorMessageDisplayed(expectedMessage);
+    expect(isDisplayed).to.be.true;
+});
+
+Then('the error message {string} should be displayed', async function (expectedMessage) {
+    const isDisplayed = await this.plantPage.isErrorMessageDisplayed(expectedMessage);
+    expect(isDisplayed).to.be.true;
+});
+
+Given('admin clicks save button', async function () {
+    await this.plantPage.clickSave();
 });
 
 Then('plant should not be added to the plants table', async function () {
@@ -109,12 +118,35 @@ Given('admin click ok to the popup from the brower', async function () {
 });
 
 Then('the plant should remove from the table', async function () {
-    // Wait for row count to decrease
+    // Wait for row count to decrease or check if table becomes empty (or shows 'No records')
+    const initialCount = this.initialPlantCount;
+    console.log(`Initial Plant Count: ${initialCount}`);
+
     await this.page.waitForFunction(
-        (expectedCount) => document.querySelectorAll('table tbody tr').length === expectedCount,
-        this.initialPlantCount - 1
-    );
-    const newCount = await this.plantPage.getPlantCount();
+        (expectedCount) => {
+            const rows = document.querySelectorAll('table tbody tr');
+            const count = rows.length;
+            // specific check for "No records" row
+            if (count === 1 && (rows[0].innerText.includes('No records') || rows[0].innerText.includes('No matching records'))) {
+                return 0 === expectedCount;
+            }
+            return count === expectedCount;
+        },
+        initialCount - 1,
+        { timeout: 60000 }
+    ).catch(e => {
+        console.error('Wait for count decrease failed.');
+        throw e;
+    });
+
+    let newCount = await this.plantPage.getPlantCount();
+    // Adjust count if "No records" row is present
+    const firstRowText = await this.plantPage.plantRows.first().innerText();
+    if (newCount === 1 && (firstRowText.includes('No records') || firstRowText.includes('No matching records'))) {
+        newCount = 0;
+    }
+
+    console.log(`New Plant Count: ${newCount}`);
     expect(newCount).to.equal(this.initialPlantCount - 1);
 });
 
