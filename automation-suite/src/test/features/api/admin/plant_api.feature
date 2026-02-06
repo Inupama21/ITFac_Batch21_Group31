@@ -48,22 +48,22 @@ Feature: Plant Management - API Tests (QA3-Umesha)
   Scenario: TC-M3-PLANT-API-009 - Verify pagination boundary conditions for Admin
     Given I am authenticated as "Admin"
     And exactly 12 plants exist in database
-    When I send a GET request to "/plants/1?page=0&size=10"
+    When I send a GET request to "/plants/paged?page=0&size=10"
     Then the response should return 10 plants
     And "first" should be true
     And "last" should be false
-    When I send a GET request to "/plants/1?page=1&size=10"
+    When I send a GET request to "/plants/paged?page=1&size=10"
     Then the response should return 2 plants
     And "first" should be false
     And "last" should be true
-    When I send a GET request to "/plants/1?page=5&size=10"
+    When I send a GET request to "/plants/paged?page=5&size=10"
     Then the response should return an empty content array or appropriate error
 
   @TC-M3-PLANT-API-010
   Scenario: TC-M3-PLANT-API-010 - Verify combined filter and sort API for Admin
     Given I am authenticated as "Admin"
     And plants exist under multiple categories with varying quantities
-    When I send a GET request to "/plants/1?page=0&size=10&sort=quantity,asc"
+    When I send a GET request to "/plants/paged?page=0&size=10&sort=quantity,asc"
     Then the response status code should be 200
     And pagination should be applied with maximum 10 results
     And plants should be sorted by quantity ascending

@@ -52,6 +52,7 @@ Feature: Plant Management - UI Tests (QA3-Umesha)
     Then plants should be sorted by Quantity in ascending order
     When I click on the "Stock" column header again
     Then plants should be sorted by Quantity in descending order
+    And the sorting indicator should show the current sort direction
     And low stock items should be easily identified when sorted ascending
     And plants should be correctly ordered by quantity value
 

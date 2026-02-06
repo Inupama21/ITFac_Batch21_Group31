@@ -3,6 +3,32 @@ const { expect } = require('@playwright/test');
 const LoginPage = require('../../pages/LoginPage');
 const PlantPage = require('../../pages/PlantPage');
 
+function toggleCase(value) {
+  return value
+    .split('')
+    .map((ch) => (ch === ch.toUpperCase() ? ch.toLowerCase() : ch.toUpperCase()))
+    .join('');
+}
+
+function normalizeTextList(values) {
+  return values.map((value) => value.trim().toLowerCase()).sort();
+}
+
+async function getSelectedCategoryLabel(page, plantPage) {
+  const selected = page.locator(`${plantPage.categoryDropdown} option:checked`);
+  const text = await selected.textContent();
+  return (text || '').trim();
+}
+
+async function hasSortIndicator(page) {
+  const headers = await page.locator('table thead th').allTextContents();
+  const hasArrow = headers.some((header) => header.includes('↑') || header.includes('↓'));
+  const ariaCount = await page
+    .locator('table thead th[aria-sort="ascending"], table thead th[aria-sort="descending"]')
+    .count();
+  return hasArrow || ariaCount > 0;
+}
+
 // ─── BACKGROUND ─────────────────────────────────────────────────────────────
 
 Given('the QA Training App is running', async function () {
@@ -42,11 +68,13 @@ Given('I am logged in as {string}', { timeout: 30000 }, async function (role) {
 Given('I am on the plants page', { timeout: 25000 }, async function () {
   const plantPage = new PlantPage(this.page);
   await plantPage.goto();
+  this.testData.initialPlantCount = await plantPage.getTableRowCount();
 });
 
 When('I navigate to the plants page', { timeout: 25000 }, async function () {
   const plantPage = new PlantPage(this.page);
   await plantPage.goto();
+  this.testData.initialPlantCount = await plantPage.getTableRowCount();
 
   if (this.testData.noPlantsExist) {
     await plantPage.searchPlant('__NO_PLANT_EXISTS_XYZ999__');
@@ -252,10 +280,38 @@ Then('only plants matching {string} should be displayed', { timeout: 15000 }, as
 });
 
 Then('non-matching plants should be filtered out', async function () {
+  const plantPage = new PlantPage(this.page);
+  const rowCount = await plantPage.getTableRowCount();
+  const searchTerm = this.testData.searchTerm || (await plantPage.getSearchInputValue());
+
+  expect(searchTerm).not.toBe('');
+
+  if (rowCount === 0) {
+    const isVisible = await plantPage.isNoDataMessageVisible();
+    expect(isVisible).toBeTruthy();
+  } else {
+    const allMatch = await plantPage.verifyOnlyMatchingPlantsDisplayed(searchTerm);
+    expect(allMatch).toBeTruthy();
+  }
   console.log('✓ Non-matching plants are filtered out');
 });
 
 Then('the search should be case-insensitive', async function () {
+  const plantPage = new PlantPage(this.page);
+  const originalTerm = this.testData.searchTerm || (await plantPage.getSearchInputValue());
+  expect(originalTerm).not.toBe('');
+
+  const originalNames = await plantPage.getAllPlantNames();
+  const toggledTerm = toggleCase(originalTerm);
+
+  await plantPage.searchPlant(toggledTerm);
+  await plantPage.clickSearchButton();
+  const toggledNames = await plantPage.getAllPlantNames();
+
+  expect(normalizeTextList(toggledNames)).toEqual(normalizeTextList(originalNames));
+
+  await plantPage.searchPlant(originalTerm);
+  await plantPage.clickSearchButton();
   console.log('✓ Search is case-insensitive');
 });
 
@@ -286,12 +342,30 @@ Then('only plants belonging to {string} category should be displayed', { timeout
 });
 
 Then('plants from other categories should be filtered out', async function () {
+  const plantPage = new PlantPage(this.page);
+  const rowCount = await plantPage.getTableRowCount();
+  const selectedCategory = this.testData.selectedCategory || (await getSelectedCategoryLabel(this.page, plantPage));
+
+  expect(selectedCategory).not.toBe('');
+
+  if (rowCount === 0) {
+    const isVisible = await plantPage.isNoDataMessageVisible();
+    expect(isVisible).toBeTruthy();
+  } else {
+    const allInCategory = await plantPage.verifyAllPlantsInCategory(selectedCategory);
+    expect(allInCategory).toBeTruthy();
+  }
   console.log('✓ Plants from other categories are filtered out');
 });
 
 Then('the plant count should update accordingly', { timeout: 15000 }, async function () {
   const plantPage = new PlantPage(this.page);
   const rowCount = await plantPage.getTableRowCount();
+  expect(rowCount).toBeGreaterThanOrEqual(0);
+
+  if (typeof this.testData.initialPlantCount === 'number') {
+    expect(rowCount).toBeLessThanOrEqual(this.testData.initialPlantCount);
+  }
   console.log(`✓ Plant count updated: ${rowCount} plants displayed`);
 });
 
@@ -372,30 +446,73 @@ Then('plants should be sorted by Quantity in descending order', { timeout: 15000
 });
 
 Then('the sorting indicator should show the current sort direction', async function () {
+  const indicatorVisible = await hasSortIndicator(this.page);
+  expect(indicatorVisible).toBeTruthy();
   console.log('✓ Sorting indicator shows direction');
 });
 
 Then('plants should be correctly ordered by price value', async function () {
+  const plantPage = new PlantPage(this.page);
+  const sortState = await plantPage.getCurrentSortState();
+  const dir = sortState.dir || (this.testData.clickCount === 2 ? 'desc' : 'asc');
+  if (sortState.field) {
+    expect(sortState.field).toBe('price');
+  }
+  const isSorted = await plantPage.verifySortingOrder('price', dir);
+  expect(isSorted).toBeTruthy();
   console.log('✓ Plants are correctly ordered by price');
 });
 
 Then('the sorting indicator should show the direction', async function () {
+  const indicatorVisible = await hasSortIndicator(this.page);
+  expect(indicatorVisible).toBeTruthy();
   console.log('✓ Sorting indicator shows direction');
 });
 
 Then('plants should be alphabetically ordered correctly', async function () {
+  const plantPage = new PlantPage(this.page);
+  const sortState = await plantPage.getCurrentSortState();
+  const dir = sortState.dir || (this.testData.clickCount === 2 ? 'desc' : 'asc');
+  if (sortState.field) {
+    expect(sortState.field).toBe('name');
+  }
+  const isSorted = await plantPage.verifySortingOrder('name', dir);
+  expect(isSorted).toBeTruthy();
   console.log('✓ Plants are alphabetically ordered');
 });
 
 Then('low stock items should be easily identified when sorted ascending', { timeout: 15000 }, async function () {
   const plantPage = new PlantPage(this.page);
   const quantities = await plantPage.getAllQuantities();
+  const sortedAsc = [...quantities].sort((a, b) => a - b);
+  const sortedDesc = [...quantities].sort((a, b) => b - a);
+  const isAsc = JSON.stringify(quantities) === JSON.stringify(sortedAsc);
+  const isDesc = JSON.stringify(quantities) === JSON.stringify(sortedDesc);
+  const hasAnyLowStock = quantities.some((qty) => qty < 5);
   const firstFewItems = quantities.slice(0, 3);
-  const hasLowStockAtTop = firstFewItems.some(qty => qty < 5);
+  const lastFewItems = quantities.slice(-3);
+  const hasLowStockAtTop = firstFewItems.some((qty) => qty < 5);
+  const hasLowStockAtBottom = lastFewItems.some((qty) => qty < 5);
+
+  expect(isAsc || isDesc).toBeTruthy();
+  if (hasAnyLowStock && isAsc) {
+    expect(hasLowStockAtTop).toBeTruthy();
+  }
+  if (hasAnyLowStock && isDesc) {
+    expect(hasLowStockAtBottom).toBeTruthy();
+  }
   console.log('✓ Low stock items are easily identified when sorted ascending');
 });
 
 Then('plants should be correctly ordered by quantity value', async function () {
+  const plantPage = new PlantPage(this.page);
+  const sortState = await plantPage.getCurrentSortState();
+  const dir = sortState.dir || (this.testData.clickCount === 2 ? 'desc' : 'asc');
+  if (sortState.field) {
+    expect(sortState.field).toBe('quantity');
+  }
+  const isSorted = await plantPage.verifySortingOrder('quantity', dir);
+  expect(isSorted).toBeTruthy();
   console.log('✓ Plants are correctly ordered by quantity');
 });
 
@@ -407,7 +524,10 @@ Then('the search field should be cleared', { timeout: 15000 }, async function ()
 });
 
 Then('the category filter should reset to {string}', { timeout: 15000 }, async function (defaultValue) {
+  const plantPage = new PlantPage(this.page);
   await this.page.waitForTimeout(500);
+  const selectedLabel = await getSelectedCategoryLabel(this.page, plantPage);
+  expect(selectedLabel.toLowerCase()).toContain(defaultValue.toLowerCase());
   console.log(`✓ Category filter reset to "${defaultValue}"`);
 });
 
@@ -419,6 +539,11 @@ Then('all plants should be displayed with no filters applied', { timeout: 15000 
 });
 
 Then('the page should return to default state', async function () {
+  const plantPage = new PlantPage(this.page);
+  const searchValue = await plantPage.getSearchInputValue();
+  const selectedLabel = await getSelectedCategoryLabel(this.page, plantPage);
+  expect(searchValue).toBe('');
+  expect(selectedLabel.toLowerCase()).toContain('all');
   console.log('✓ Page returned to default state');
 });
 
