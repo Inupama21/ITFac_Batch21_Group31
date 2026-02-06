@@ -1,28 +1,38 @@
-const { setWorldConstructor, Before, After } = require('@cucumber/cucumber');
+const { setWorldConstructor, Before, After, setDefaultTimeout } = require('@cucumber/cucumber');
 const { chromium } = require('playwright');
+
+// Increase default timeout if your local environment is slow
+setDefaultTimeout(30000); 
 
 class CustomWorld {
   async openBrowser() {
-    this.browser = await chromium.launch({ headless: false });
+    this.browser = await chromium.launch({ 
+        headless: false,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'] 
+    });
     this.context = await this.browser.newContext();
     this.page = await this.context.newPage();
   }
 
   async closeBrowser() {
-    await this.page.close();
-    await this.context.close();
-    await this.browser.close();
+    // Check if objects exist before trying to close them to avoid null errors
+    if (this.page) await this.page.close();
+    if (this.context) await this.context.close();
+    if (this.browser) await this.browser.close();
   }
 }
 
 setWorldConstructor(CustomWorld);
 
-// Before each scenario
 Before(async function () {
   await this.openBrowser();
 });
 
-// After each scenario
 After(async function () {
-  await this.closeBrowser();
+  try {
+    // Wrap cleanup in a try-catch to prevent one failure from hanging the suite
+    await this.closeBrowser();
+  } catch (error) {
+    console.error("Error during browser teardown:", error.message);
+  }
 });
