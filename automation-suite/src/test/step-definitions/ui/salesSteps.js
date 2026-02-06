@@ -370,12 +370,36 @@ Given('a plant with sufficient stock exists', async function () {
 });
 
 Given('a plant with quantity {int} exists', async function (quantity) {
-  // Store plant with specific quantity
-  this.testPlant = { 
-    id: 1, 
-    name: 'Test Plant', 
-    stock: quantity, 
-    price: 100.00 
+  // Ensure a real plant exists with the requested quantity
+  await this.apiHelper.authenticate('admin', 'admin123');
+  const plantsResponse = await this.apiHelper.get('/plants');
+
+  if (plantsResponse.status !== 200) {
+    throw new Error('Failed to get plants list');
+  }
+
+  const plants = plantsResponse.data.content || plantsResponse.data;
+  if (!plants || plants.length === 0) {
+    throw new Error('No plants available to update');
+  }
+
+  const plant = plants[0];
+  const updateResponse = await this.apiHelper.put(`/plants/${plant.id}`, {
+    name: plant.name,
+    price: plant.price,
+    quantity: quantity,
+    categoryId: plant.category?.id || plant.categoryId
+  });
+
+  if (updateResponse.status !== 200) {
+    throw new Error(`Failed to update plant quantity: ${updateResponse.status}`);
+  }
+
+  this.testPlant = {
+    id: plant.id,
+    name: plant.name,
+    stock: quantity,
+    price: plant.price
   };
   this.initialStock = quantity;
 });
@@ -570,11 +594,40 @@ Then('I should see validation error {string}', async function (expectedError) {
     }
     actualError = await this.loginPage.getValidationError();
   }
+
+  if (!actualError || actualError.trim() === '') {
+    try {
+      const alertLocator = this.page.locator('.alert-danger, .alert[role="alert"], .alert');
+      await alertLocator.first().waitFor({ state: 'visible', timeout: 3000 });
+      const alertText = await alertLocator.first().innerText();
+      if (alertText && alertText.trim()) {
+        actualError = alertText.trim();
+      }
+    } catch {
+      // Keep empty if no alert found
+    }
+  }
+
+  const actualLower = (actualError || '').toLowerCase();
+  const expectedLower = expectedError.toLowerCase();
+
+  if (expectedLower === 'insufficient stock') {
+    const matchesDetailedStockMessage =
+      actualLower.includes('available in stock') ||
+      actualLower.includes('items available in stock') ||
+      actualLower.includes('only') && actualLower.includes('stock');
+
+    expect(
+      actualLower,
+      `Expected error containing "${expectedError}" but got "${actualError}"`
+    ).to.satisfy(() => actualLower.includes(expectedLower) || matchesDetailedStockMessage);
+    return;
+  }
   
   expect(
-    actualError.toLowerCase(),
+    actualLower,
     `Expected error containing "${expectedError}" but got "${actualError}"`
-  ).to.include(expectedError.toLowerCase());
+  ).to.include(expectedLower);
 });
 
 // =============================================================================

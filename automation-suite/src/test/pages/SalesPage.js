@@ -353,7 +353,15 @@ class SalesPage {
   async getValidationError() {
     try {
       await this.page.waitForTimeout(500);
-      const elements = await this.page.$$(this.validationError.join(','));
+      const validationSelector = this.validationError.join(',');
+
+      try {
+        await this.page.waitForSelector(validationSelector, { timeout: 2000 });
+      } catch {
+        // Continue to fallbacks
+      }
+
+      const elements = await this.page.$$(validationSelector);
       
       for (const el of elements) {
         const isVisible = await el.isVisible();
@@ -364,6 +372,22 @@ class SalesPage {
           }
         }
       }
+      const alert = await this.page.$('.alert, .alert-danger, [role="alert"]');
+      if (alert) {
+        const alertText = await alert.textContent();
+        if (alertText && alertText.trim()) {
+          return alertText.trim();
+        }
+      }
+
+      const invalidField = await this.page.$('form :invalid, input:invalid, select:invalid, textarea:invalid');
+      if (invalidField) {
+        const message = await invalidField.evaluate(el => el.validationMessage || '');
+        if (message && message.trim()) {
+          return message.trim();
+        }
+      }
+
       return '';
     } catch {
       return '';
