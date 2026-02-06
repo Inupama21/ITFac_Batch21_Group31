@@ -46,11 +46,6 @@ Then('I should see error message {string}', async function (expectedError) {
   expect(actualError).to.include(expectedError);
 });
 
-Then('I should see validation error {string}', async function (expectedError) {
-  const actualError = await this.loginPage.getValidationError();
-  expect(actualError).to.include(expectedError);
-});
-
 Then('I should remain on login page', async function () {
   const isOnLogin = await this.loginPage.isOnLoginPage();
   expect(isOnLogin).to.be.true;
