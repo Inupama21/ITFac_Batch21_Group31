@@ -1,4 +1,4 @@
-@ui
+@ui @admin
 Feature: Category UI Management
   As an Admin user
   I want to manage categories
@@ -38,7 +38,7 @@ Feature: Category UI Management
     Then the category list should only show categories with parent "cat1"
 
 
-  Scenario: TC_UI_ADMIN_CATEGORY_008 - Admin cannot add a category with empty name
+  Scenario: TC_UI_ADMIN_CATEGORY_006 - Admin cannot add a category with empty name
     Given I am logged in as an "Admin"
     When I navigate to the Categories page
     And I click "Add A Category" but save without typing a name

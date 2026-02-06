@@ -1,11 +1,10 @@
 const { setWorldConstructor, Before, After } = require('@cucumber/cucumber');
-const { chromium, request } = require('playwright'); // Added 'request' [cite: 280]
+const { chromium, request } = require('playwright'); 
 
 class CustomWorld {
-  // Method to initialize API context
   async initAPI() {
     this.request = await request.newContext({
-      baseURL: 'http://localhost:8080', // Base URL from instructions [cite: 38]
+      baseURL: 'http://localhost:8080', 
     });
   }
 
@@ -19,14 +18,13 @@ class CustomWorld {
     if (this.page) await this.page.close();
     if (this.context) await this.context.close();
     if (this.browser) await this.browser.close();
-    if (this.request) await this.request.dispose(); // Clean up API context
+    if (this.request) await this.request.dispose(); 
   }
 }
 
 setWorldConstructor(CustomWorld);
 
 Before(async function (scenario) {
-  // Always initialize API context for all tests [cite: 300]
   await this.initAPI();
 
   // Only open the browser if it's a UI test (optional optimization)

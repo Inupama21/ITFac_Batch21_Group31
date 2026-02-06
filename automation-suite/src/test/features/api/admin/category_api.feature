@@ -1,5 +1,8 @@
 @api @admin
-Feature: Category API Search and Pagination
+Feature: Category Management API - User Role
+    As an Admin User
+    I want to view and search categories
+    So that I can manage the plant structure effectively
 
   Scenario: TC_API_ADMIN_CATEGORY_001 - Verify Admin search categories by name returns matching results
     Given I am authenticated as a "Admin"
@@ -13,8 +16,7 @@ Feature: Category API Search and Pagination
     Then the response status code should be 200
     And the response body list size should represent the total categories in database
 
-# bug
-@skip @known_issue
+
   Scenario: TC_API_ADMIN_CATEGORY_003 - Verify Admin sort by ID ascending
     Given I am authenticated as a "Admin"
     When I send a GET request to "/api/categories/page" sorted by "id" in "asc" order
