@@ -1,4 +1,4 @@
-@ui @categories @user
+# @ui @categories @user
 Feature: Category UI View and Access Control
   As a User of the QA Training App
   I want to view categories and navigate the list
