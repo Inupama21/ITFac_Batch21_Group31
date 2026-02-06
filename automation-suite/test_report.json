@@ -1,0 +1,176 @@
+[
+  {
+    "description": "  As a regular user\n  I want to access plant information via API\n  So that I can view available plants",
+    "elements": [
+      {
+        "description": "",
+        "id": "user-plant-api-operations;verify-user-cannot-update-plant-details-via-api",
+        "keyword": "Scenario",
+        "line": 20,
+        "name": "Verify user cannot update plant details via API",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 704710500
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 21,
+            "name": "I am authenticated for API with \"Admin\" credentials",
+            "match": {
+              "location": "src\\test\\step-definitions\\api\\plantApiSteps.js:8"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 139243599
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 22,
+            "name": "I have an existing plant",
+            "match": {
+              "location": "src\\test\\step-definitions\\api\\plantApiSteps.js:70"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 72269700
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 23,
+            "name": "I am authenticated for API with \"User\" credentials",
+            "match": {
+              "location": "src\\test\\step-definitions\\api\\plantApiSteps.js:8"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 136388999
+            }
+          },
+          {
+            "arguments": [
+              {
+                "rows": [
+                  {
+                    "cells": [
+                      "name",
+                      "price",
+                      "quantity"
+                    ]
+                  },
+                  {
+                    "cells": [
+                      "Hacked Plant",
+                      "1.00",
+                      "999"
+                    ]
+                  }
+                ]
+              }
+            ],
+            "keyword": "When ",
+            "line": 24,
+            "name": "I send a PUT request to \"/api/plants/{id}\" with the following data:",
+            "match": {
+              "location": "src\\test\\step-definitions\\api\\plantApiSteps.js:92"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 14103100
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 27,
+            "name": "the response status code should be 403",
+            "match": {
+              "location": "src\\test\\step-definitions\\api\\plantApiSteps.js:49"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1922000
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 28,
+            "name": "the response should contain an error message",
+            "match": {
+              "location": "src\\test\\step-definitions\\api\\plantApiSteps.js:60"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 2008000
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 29,
+            "name": "the plant data should remain unchanged",
+            "match": {
+              "location": "src\\test\\step-definitions\\api\\plantApiSteps.js:175"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 10830899
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 490775100
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@api",
+            "line": 1
+          },
+          {
+            "name": "@plant",
+            "line": 1
+          },
+          {
+            "name": "@user",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      }
+    ],
+    "id": "user-plant-api-operations",
+    "line": 2,
+    "keyword": "Feature",
+    "name": "User Plant API Operations",
+    "tags": [
+      {
+        "name": "@api",
+        "line": 1
+      },
+      {
+        "name": "@plant",
+        "line": 1
+      },
+      {
+        "name": "@user",
+        "line": 1
+      }
+    ],
+    "uri": "src\\test\\features\\api\\user\\plant_api.feature"
+  }
+]

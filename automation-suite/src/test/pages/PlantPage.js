@@ -23,6 +23,25 @@ class PlantPage {
 
     this.editButton = 'a.btn-outline-primary[title="Edit"]';
     this.deleteButton = 'button.btn-outline-danger[title="Delete"]';
+
+    this.addPlantBtn = page.locator('button, a').filter({ hasText: /Add.*Plant/i }).first();
+    this.plantRows = page.locator('table tbody tr');
+
+    this.nameInput = page.locator('#name');
+    this.categoryDropdownInput = page.locator('#categoryId');
+    this.priceInput = page.locator('#price');
+    this.quantityInput = page.locator('#quantity');
+    this.saveButton = page.locator('button', { hasText: /save/i });
+
+    this.priceError = page.locator('text=Price must be greater than 0');
+
+    this.tableEditButton = page
+      .locator('table tbody tr:first-child .bi-pencil-square, table tbody tr:first-child button:has-text("Edit")')
+      .first();
+    this.tableDeleteButton = page
+      .locator('table tbody tr:first-child .bi-trash, table tbody tr:first-child button:has-text("Delete")')
+      .first();
+    this.successMessage = page.locator('text=Plant deleted successfully');
   }
 
   // ─── NAVIGATION ─────────────────────────────────────────────────────────────
@@ -32,6 +51,10 @@ class PlantPage {
       timeout: 30000,
     });
     await this.page.waitForSelector('table', { state: 'visible', timeout: 10000 });
+  }
+
+  async gotoPlantsPage() {
+    await this.goto();
   }
 
   // ─── CURRENT SORT STATE (from URL) ──────────────────────────────────────────
@@ -51,6 +74,11 @@ class PlantPage {
   }
 
   async selectCategory(categoryName) {
+    if (!categoryName) {
+      await this.categoryDropdownInput.selectOption({ index: 1 });
+      return;
+    }
+
     await this.page.waitForSelector(this.categoryDropdown, { state: 'visible', timeout: 10000 });
 
     try {
@@ -97,26 +125,19 @@ class PlantPage {
   }
 
   // ─── COLUMN SORTING ─────────────────────────────────────────────────────────
- async clickColumnHeader(columnName) {
+  async clickColumnHeader(columnName) {
     const fieldMap = { Name: 'name', Price: 'price', Stock: 'quantity' };
     const targetField = fieldMap[columnName] || columnName.toLowerCase();
 
-    // The app defaults to name/asc even when URL has no sortField param.
-    // Normalise so clickColumnHeader knows the true current state.
     let sortState = await this.getCurrentSortState();
     if (!sortState.field) {
       sortState = { field: 'name', dir: 'asc' };
     }
 
-    console.log(`clickColumnHeader("${columnName}") — effective sort: ${JSON.stringify(sortState)}`);
-
     if (sortState.field === targetField) {
-      // Already sorted on this column — click a different column first to reset,
-      // so the next click on the target produces ASC.
       const resetFields = Object.entries(fieldMap).filter(([, v]) => v !== targetField);
       const [resetDisplayName] = resetFields[0];
 
-      console.log(`  resetting via "${resetDisplayName}" first`);
       await this.page.click(`table thead th a:has-text("${resetDisplayName}")`);
       await this.page.waitForSelector('table', { state: 'visible', timeout: 10000 });
     }
@@ -136,9 +157,14 @@ class PlantPage {
   }
 
   async isAddPlantButtonVisible() {
+    const count = await this.addPlantBtn.count();
+    if (count > 0) {
+      return await this.addPlantBtn.isVisible();
+    }
+
     try {
-      const count = await this.page.locator(this.addPlantButton).count();
-      return count > 0;
+      const legacyCount = await this.page.locator(this.addPlantButton).count();
+      return legacyCount > 0;
     } catch {
       return false;
     }
@@ -192,8 +218,6 @@ class PlantPage {
     return await this.page.locator(this.categoryDropdown).inputValue();
   }
 
-  // ─── FIX 1: trim() every name so whitespace or stray arrow chars
-  //            (↑ / ↓) that live inside the <td> don't pollute the string.
   async getAllPlantNames() {
     const raw = await this.page.locator(this.plantNameColumn).allTextContents();
     return raw.map((name) => name.trim());
@@ -238,7 +262,6 @@ class PlantPage {
     return results;
   }
 
-  
   async verifySortingOrder(columnName, order = 'asc') {
     await this.page.waitForSelector('table', { state: 'visible', timeout: 5000 });
 
@@ -249,26 +272,22 @@ class PlantPage {
           ? a.localeCompare(b, undefined, { sensitivity: 'base' })
           : b.localeCompare(a, undefined, { sensitivity: 'base' })
       );
-      console.log('Current names: ', names);
-      console.log('Expected sorted:', sorted);
       return JSON.stringify(names) === JSON.stringify(sorted);
+    }
 
-    } else if (columnName.toLowerCase() === 'price') {
+    if (columnName.toLowerCase() === 'price') {
       const prices = await this.getAllPrices();
       const sorted = [...prices].sort((a, b) =>
         order === 'asc' ? a - b : b - a
       );
-      console.log('Current prices: ', prices);
-      console.log('Expected sorted:', sorted);
       return JSON.stringify(prices) === JSON.stringify(sorted);
+    }
 
-    } else if (columnName.toLowerCase() === 'stock' || columnName.toLowerCase() === 'quantity') {
+    if (columnName.toLowerCase() === 'stock' || columnName.toLowerCase() === 'quantity') {
       const quantities = await this.getAllQuantities();
       const sorted = [...quantities].sort((a, b) =>
         order === 'asc' ? a - b : b - a
       );
-      console.log('Current quantities: ', quantities);
-      console.log('Expected sorted:   ', sorted);
       return JSON.stringify(quantities) === JSON.stringify(sorted);
     }
 
@@ -302,6 +321,152 @@ class PlantPage {
     return categories.every((cat) =>
       cat.toLowerCase().includes(categoryName.toLowerCase())
     );
+  }
+
+  // ─── ADD / EDIT / DELETE FORM HELPERS ──────────────────────────────────────
+  async clickAddPlantButton() {
+    const count = await this.addPlantBtn.count();
+    if (count > 0) {
+      await this.addPlantBtn.click();
+      return;
+    }
+
+    await this.page.click(this.addPlantButton);
+  }
+
+  async enterPlantName(name) {
+    await this.nameInput.fill(name);
+  }
+
+  async selectCategoryForForm() {
+    await this.categoryDropdownInput.selectOption({ index: 1 });
+  }
+
+  async enterPrice(price) {
+    await this.priceInput.fill(price);
+  }
+
+  async enterQuantity(quantity) {
+    await this.quantityInput.fill(quantity);
+  }
+
+  async clickSave() {
+    await this.saveButton.click();
+  }
+
+  async getPriceErrorMessage() {
+    await this.priceError.waitFor({ timeout: 5000 });
+    return await this.priceError.textContent();
+  }
+
+  async isErrorMessageDisplayed(message) {
+    const errorLocator = this.page.locator(`text=${message}`);
+    await errorLocator.waitFor({ state: 'visible', timeout: 10000 });
+    return await errorLocator.isVisible();
+  }
+
+  async isPlantPresent(name) {
+    const rows = await this.plantRows.allTextContents();
+    return rows.some(row => row.includes(name));
+  }
+
+  async getCategoryOptions() {
+    await this.categoryDropdownInput.waitFor({ state: 'visible' });
+    return await this.categoryDropdownInput.locator('option').allInnerTexts();
+  }
+
+  async clickEditPlantButton() {
+    await this.plantRows.first().waitFor();
+    await this.tableEditButton.click();
+  }
+
+  async getPlantNameValue() {
+    await this.nameInput.waitFor({ state: 'visible' });
+    return await this.nameInput.inputValue();
+  }
+
+  async getPlantPriceValue() {
+    await this.priceInput.waitFor({ state: 'visible' });
+    return await this.priceInput.inputValue();
+  }
+
+  async getPlantQuantityValue() {
+    await this.quantityInput.waitFor({ state: 'visible' });
+    return await this.quantityInput.inputValue();
+  }
+
+  async clickDeletePlantButton() {
+    await this.plantRows.first().waitFor();
+
+    this.page.once('dialog', async dialog => {
+      await dialog.accept();
+    });
+
+    await this.tableDeleteButton.click();
+  }
+
+  async getSuccessMessageText() {
+    await this.successMessage.waitFor({ state: 'visible', timeout: 10000 });
+    return await this.successMessage.textContent();
+  }
+
+  async getPlantCount() {
+    return await this.plantRows.count();
+  }
+
+  async isTableDisplayed() {
+    return await this.plantRows.first().isVisible();
+  }
+
+  async isEditButtonVisible() {
+    await this.plantRows.first().waitFor();
+    return await this.tableEditButton.isVisible();
+  }
+
+  async isDeleteButtonVisible() {
+    await this.plantRows.first().waitFor();
+    return await this.tableDeleteButton.isVisible();
+  }
+
+  async clickPlantNameInTable() {
+    await this.plantRows.first().waitFor();
+    await this.plantRows.first().locator('td').first().click();
+  }
+
+  async isEditModalDisplayed() {
+    try {
+      return await this.nameInput.isVisible({ timeout: 2000 });
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async clickPriceCell() {
+    await this.plantRows.first().waitFor();
+    await this.plantRows.first().locator('td').nth(2).click();
+  }
+
+  async isPriceCellEditable() {
+    const cellInput = this.plantRows.first().locator('td').nth(2).locator('input');
+    if (await cellInput.count() > 0 && await cellInput.isVisible()) return true;
+
+    if (await this.priceInput.isVisible()) return true;
+
+    return false;
+  }
+
+  async rightClickPlantRow() {
+    await this.plantRows.first().waitFor();
+    await this.plantRows.first().click({ button: 'right' });
+  }
+
+  async isContextMenuDisplayed() {
+    const contextMenu = this.page.locator('.context-menu, .dropdown-menu, [role="menu"]');
+    try {
+      return await contextMenu.first().isVisible({ timeout: 2000 });
+    } catch (e) {
+      return false;
+    }
   }
 }
 
