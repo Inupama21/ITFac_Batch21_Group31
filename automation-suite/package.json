@@ -9,7 +9,7 @@
     "test:api": "cucumber-js src/test/features/api/**/*.feature",
     "test:plant": "cucumber-js \"src/test/features/{ui,api}/**/*.feature\" --tags \"@plant and (@ui or @api)\" --format allure-cucumberjs/reporter --format summary ",
     "test:ui:plant": "cucumber-js src/test/features/ui/**/*.feature --tags \"@plant and @ui\" --format allure-cucumberjs/reporter --format summary",
-    "test:api:plant": "cucumber-js src/test/features/api/**/*.feature --tags \"@plant and @api\" --format summary --format allure-cucumberjs/reporter",
+    "test:api:plant": "cucumber-js src/test/features/api/**/*.feature --tags \"@plant and @api\" --format allure-cucumberjs/reporter --format summary",
     "allure:generate": "allure generate allure-results --clean -o allure-report",
     "allure:open": "allure open allure-report"
   },
