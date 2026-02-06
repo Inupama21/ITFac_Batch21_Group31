@@ -15,8 +15,8 @@ Feature: Category UI Management
 
   @TC-M2-CAT-UI-002
   Scenario: Verify Admin can add a category with valid name
-    When I add a new category with name "MyPlant7"
-    Then the category "MyPlant7" should be visible in the category list
+    When I add a new category with name "MyPlant89"
+    Then the category "MyPlant89" should be visible in the category list
 
   @TC-M2-CAT-UI-003
   Scenario: Verify error when Category Name is empty
@@ -32,3 +32,15 @@ Feature: Category UI Management
   Scenario: Verify error when Category Name length is more than 10
     When I add a new category with name "PlantsExtraLongName"
     Then I should see a validation error "Category name must be between 3 and 10 characters"
+
+  @TC-M2-CAT-UI-009
+  Scenario: Verify category edit functionality with data pre-population
+    And admin clicks edit button of any categories
+    Then admin should see the edit category page with pre-populated data
+
+ @TC-M2-CAT-UI-010
+  Scenario: Verify category deletion from UI
+    And admin clicks delete button of any categories
+    And admin click ok to the popup from the browser
+    Then the category should remove from the table
+    And the successful message "category deleted successfully" should be displayed
