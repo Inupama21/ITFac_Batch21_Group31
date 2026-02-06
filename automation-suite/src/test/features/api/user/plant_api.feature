@@ -28,7 +28,7 @@ Feature: User Plant API Operations
     And the response should contain an error message
     And the plant data should remain unchanged
 
-  Scenario: Verify user cannot create plant via API
+  Scenario: Verify user cannot create plant via API - TC-M4-PLANT-API-009
     Given I am authenticated for API with "User" credentials
     When I send a POST request to "/api/plants/category/4" with the following data:
       | name          | price | quantity |
@@ -36,7 +36,7 @@ Feature: User Plant API Operations
     Then the response status code should be 403
     And the error message should indicate insufficient permissions
 
-  Scenario: Verify user cannot delete plant via API
+  Scenario: Verify user cannot delete plant via API - TC-M4-PLANT-API-010
     Given I am authenticated for API with "Admin" credentials
     And I have an existing plant
     And I am authenticated for API with "User" credentials
