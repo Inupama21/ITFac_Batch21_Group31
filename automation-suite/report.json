@@ -1,0 +1,119 @@
+[
+  {
+    "description": "  As a regular user\n  I want to access plant information via API\n  So that I can view available plants",
+    "elements": [
+      {
+        "description": "",
+        "id": "user-plant-api-operations;verify-user-can-retrieve-plant-summary---tc-m4-plant-api-new",
+        "keyword": "Scenario",
+        "line": 14,
+        "name": "Verify user can retrieve plant summary - TC-M4-PLANT-API-NEW",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 792490299
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 15,
+            "name": "I am authenticated for API with \"User\" credentials",
+            "match": {
+              "location": "src\\test\\step-definitions\\api\\plantApiSteps.js:8"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 159893000
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "When ",
+            "line": 16,
+            "name": "I send a GET request to \"/api/plants/summary\"",
+            "match": {
+              "location": "src\\test\\step-definitions\\api\\plantApiSteps.js:104"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 78713500
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 17,
+            "name": "the response status code should be 200",
+            "match": {
+              "location": "src\\test\\step-definitions\\api\\plantApiSteps.js:49"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 6251800
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "And ",
+            "line": 18,
+            "name": "the response should contain plant summary data",
+            "match": {
+              "location": "src\\test\\step-definitions\\api\\plantApiSteps.js:162"
+            },
+            "result": {
+              "status": "failed",
+              "duration": 6820900,
+              "error_message": "AssertionError: expected { totalPlants: 11, lowStockPlants: +0 } to be an array\n    at CustomWorld.<anonymous> (D:\\Semester 07\\QAproject\\ITFac_Batch21_Group31\\automation-suite\\src\\test\\step-definitions\\api\\plantApiSteps.js:164:36)"
+            }
+          },
+          {
+            "keyword": "After",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 484572900
+            }
+          }
+        ],
+        "tags": [
+          {
+            "name": "@api",
+            "line": 1
+          },
+          {
+            "name": "@plant",
+            "line": 1
+          },
+          {
+            "name": "@user",
+            "line": 1
+          }
+        ],
+        "type": "scenario"
+      }
+    ],
+    "id": "user-plant-api-operations",
+    "line": 2,
+    "keyword": "Feature",
+    "name": "User Plant API Operations",
+    "tags": [
+      {
+        "name": "@api",
+        "line": 1
+      },
+      {
+        "name": "@plant",
+        "line": 1
+      },
+      {
+        "name": "@user",
+        "line": 1
+      }
+    ],
+    "uri": "src\\test\\features\\api\\user\\plant_api.feature"
+  }
+]
