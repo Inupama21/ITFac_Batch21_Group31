@@ -1,3 +1,4 @@
+@ui
 Feature: Add Plant Form Validation
 
   Scenario: Verify price validation error message - TC-M4-PLANT-UI-001
@@ -32,12 +33,12 @@ Feature: Add Plant Form Validation
     Then the plant should remove from the table
     And the successful message "Plant deleted successfully" should be displayed
 
-  Scenario: Verify required field validation in Add Plant form
+  Scenario: Verify required field validation in Add Plant form - TC-M4-PLANT-UI-005
     Given admin is logged in
     And admin is on the Plants page
     And admin clicks Add a Plant button
     Then admin should see the Add Plant page
-    And admin clicks save button 
+    And admin clicks save button
     Then the error message "Plant name is required" should be displayed
     And the error message "Plant name must be between 3 and 25 characters" should be displayed
     And the error message "Category is required" should be displayed
