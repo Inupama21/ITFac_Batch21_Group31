@@ -181,26 +181,33 @@ Given('multiple sales exist with different plant names via API', async function 
 });
 
 Given('{int} sales records exist in system via API', async function (count) {
-  // Get current sales using pagination with large page size
-  const currentSalesResponse = await this.apiHelper.get('/sales/page?page=0&size=1000');
-  let existingSales = [];
-  
-  if (currentSalesResponse.status === 200) {
-    existingSales = currentSalesResponse.data.content || [];
-  }
-  
-  console.log(`[Test] Found ${existingSales.length} existing sales, target: ${count}`);
-  
+  const pageSize = 50;
+  const getSalesPage = async () => {
+    const response = await this.apiHelper.get(`/sales/page?page=0&size=${pageSize}`);
+    if (response.status === 200 && response.data && Array.isArray(response.data.content)) {
+      return response.data.content;
+    }
+    return [];
+  };
+
+  let existingSales = await getSalesPage();
+  console.log(`[Test] Found ${existingSales.length} existing sales on first page, target: ${count}`);
+
   // Delete all existing sales to start fresh
   if (existingSales.length > 0) {
-    console.log(`[Test] Deleting ${existingSales.length} existing sales...`);
-    for (const sale of existingSales) {
-      const deleteResponse = await this.apiHelper.delete(`/sales/${sale.id}`);
-      if (deleteResponse.status === 204 || deleteResponse.status === 200) {
-        console.log(`[Test] Deleted existing sale ${sale.id}`);
-      } else {
-        console.warn(`[Test] Failed to delete sale ${sale.id}: ${deleteResponse.status}`);
+    console.log(`[Test] Deleting existing sales...`);
+    let guard = 0;
+    while (existingSales.length > 0 && guard < 20) {
+      for (const sale of existingSales) {
+        const deleteResponse = await this.apiHelper.delete(`/sales/${sale.id}`);
+        if (deleteResponse.status === 204 || deleteResponse.status === 200) {
+          console.log(`[Test] Deleted existing sale ${sale.id}`);
+        } else {
+          console.warn(`[Test] Failed to delete sale ${sale.id}: ${deleteResponse.status}`);
+        }
       }
+      existingSales = await getSalesPage();
+      guard += 1;
     }
   }
   
@@ -217,44 +224,72 @@ Given('{int} sales records exist in system via API', async function (count) {
     throw new Error('No plants available to create sales');
   }
   
+  const getPlantById = async (plantId) => {
+    const response = await this.apiHelper.get(`/plants/${plantId}`);
+    if (response.status === 200) {
+      return response.data;
+    }
+    throw new Error(`Failed to refresh plant ${plantId}: ${response.status}`);
+  };
+
+  const ensurePlantStock = async (plant, minQuantity) => {
+    if (plant.quantity >= minQuantity) {
+      return plant;
+    }
+
+    const updateResponse = await this.apiHelper.put(`/plants/${plant.id}`, {
+      name: plant.name,
+      price: plant.price,
+      quantity: Math.max(100, minQuantity),
+      categoryId: plant.category?.id || plant.categoryId
+    });
+
+    if (updateResponse.status !== 200) {
+      throw new Error(`Failed to update plant stock for sale creation: ${updateResponse.status}`);
+    }
+
+    return updateResponse.data;
+  };
+
   // Create exactly the target number of sales
   if (count > 0) {
     console.log(`[Test] Creating ${count} sales...`);
-    
-    for (let i = 0; i < count; i++) {
-      // Use first plant for simplicity
-      let plant = plants[0];
-      
-      // Check if plant has stock before each sale
-      if (plant.quantity <= 0) {
-        // Update plant to have sufficient stock
-        const updateResponse = await this.apiHelper.put(`/plants/${plant.id}`, {
-          name: plant.name,
-          price: plant.price,
-          quantity: 100, // Set high quantity to ensure we can create all sales
-          categoryId: plant.category?.id || plant.categoryId
-        });
-        
-        if (updateResponse.status !== 200) {
-          console.warn(`[Test] Failed to update plant stock for sale creation`);
-          continue;
+    let createdCount = 0;
+
+    for (let i = 0; i < count; i += 1) {
+      const plantIndex = i % plants.length;
+      let plant = await getPlantById(plants[plantIndex].id);
+      plant = await ensurePlantStock(plant, 1);
+      plants[plantIndex] = plant;
+
+      let saleCreated = false;
+      let attempt = 0;
+      const maxAttemptsPerSale = 3;
+
+      while (!saleCreated && attempt < maxAttemptsPerSale) {
+        attempt += 1;
+        const saleResponse = await this.apiHelper.post(`/sales/plant/${plant.id}?quantity=1`, {});
+
+        if (saleResponse.status === 201 || saleResponse.status === 200) {
+          this.createdResources.sales.push(saleResponse.data.id);
+          createdCount += 1;
+          saleCreated = true;
+          console.log(`[Test] Created sale ${createdCount}/${count} with ID: ${saleResponse.data.id}`);
+
+          if (saleResponse.data.plant) {
+            plants[plantIndex] = saleResponse.data.plant;
+            plant = saleResponse.data.plant;
+          }
+        } else {
+          console.warn(`[Test] Failed to create sale ${i + 1}/${count} (attempt ${attempt}): ${saleResponse.status} - ${JSON.stringify(saleResponse.data)}`);
+          plant = await getPlantById(plant.id);
+          plant = await ensurePlantStock(plant, 1);
+          plants[plantIndex] = plant;
         }
-        plant = updateResponse.data;
       }
-      
-      // Create a sale
-      const saleResponse = await this.apiHelper.post(`/sales/plant/${plant.id}?quantity=1`, {});
-      
-      if (saleResponse.status === 201 || saleResponse.status === 200) {
-        this.createdResources.sales.push(saleResponse.data.id);
-        console.log(`[Test] Created sale ${i + 1}/${count} with ID: ${saleResponse.data.id}`);
-        
-        // Update plant info for next iteration
-        if (saleResponse.data.plant) {
-          plants[0] = saleResponse.data.plant;
-        }
-      } else {
-        console.warn(`[Test] Failed to create sale ${i + 1}/${count}: ${saleResponse.status} - ${JSON.stringify(saleResponse.data)}`);
+
+      if (!saleCreated) {
+        throw new Error(`Failed to create sale ${i + 1}/${count} after ${maxAttemptsPerSale} attempts.`);
       }
     }
   }
