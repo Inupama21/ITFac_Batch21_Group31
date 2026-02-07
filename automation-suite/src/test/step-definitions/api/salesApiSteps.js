@@ -103,27 +103,69 @@ Given('a sale exists with known ID', async function () {
 });
 
 Given('no sales records exist in system via API', async function () {
-  // Get all sales and delete them
-  const salesResponse = await this.apiHelper.get('/sales');
-  
-  if (salesResponse.status === 200) {
-    const sales = salesResponse.data.content || salesResponse.data;
-    
-    if (sales.length > 0) {
-      console.log(`[Test] Found ${sales.length} existing sales, deleting them...`);
-      
-      for (const sale of sales) {
-        const deleteResponse = await this.apiHelper.delete(`/sales/${sale.id}`);
-        if (deleteResponse.status === 204 || deleteResponse.status === 200) {
-          console.log(`[Test] Deleted sale ${sale.id}`);
-        } else {
-          console.warn(`[Test] Failed to delete sale ${sale.id}: ${deleteResponse.status}`);
-        }
+  const pageSize = 100;
+  const getSalesPage = async (page) => {
+    const response = await this.apiHelper.get(`/sales/page?page=${page}&size=${pageSize}`);
+    if (response.status === 200 && response.data && Array.isArray(response.data.content)) {
+      return response.data.content;
+    }
+    if (response.status === 200 && Array.isArray(response.data)) {
+      return response.data;
+    }
+    return null;
+  };
+
+  const getAllSalesFallback = async () => {
+    const response = await this.apiHelper.get('/sales');
+    if (response.status === 200) {
+      return response.data.content || response.data;
+    }
+    return [];
+  };
+
+  const deleteSaleById = async (saleId) => {
+    const deleteResponse = await this.apiHelper.delete(`/sales/${saleId}`);
+    if (deleteResponse.status === 204 || deleteResponse.status === 200) {
+      console.log(`[Test] Deleted sale ${saleId}`);
+      return true;
+    }
+    console.warn(`[Test] Failed to delete sale ${saleId}: ${deleteResponse.status}`);
+    return false;
+  };
+
+  let sales = await getSalesPage(0);
+  if (sales === null) {
+    sales = await getAllSalesFallback();
+  }
+
+  if (Array.isArray(sales) && sales.length > 0) {
+    console.log(`[Test] Found ${sales.length} existing sales, deleting them...`);
+    let guard = 0;
+    while (guard < 20) {
+      const pageSales = await getSalesPage(0);
+      if (!Array.isArray(pageSales)) {
+        break;
       }
+      if (pageSales.length === 0) {
+        break;
+      }
+      for (const sale of pageSales) {
+        await deleteSaleById(sale.id);
+      }
+      guard += 1;
     }
   }
-  
-  console.log(`[Test] Ensured no sales records exist in system`);
+
+  let remainingSales = await getSalesPage(0);
+  if (remainingSales === null) {
+    remainingSales = await getAllSalesFallback();
+  }
+
+  if (Array.isArray(remainingSales) && remainingSales.length > 0) {
+    throw new Error(`Expected no sales records, but found ${remainingSales.length}`);
+  }
+
+  console.log('[Test] Ensured no sales records exist in system');
   this.noSalesExpected = true;
 });
 
