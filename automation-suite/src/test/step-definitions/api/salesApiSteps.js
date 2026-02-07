@@ -241,26 +241,59 @@ Given('a plant exists with quantity {int}', async function (quantity) {
     throw new Error('No plants available in system');
   }
   
-  // Find plant with exact quantity or use first plant and update it
-  let suitablePlant = plants.find(p => p.quantity === quantity);
-  
-  if (!suitablePlant) {
-    // Use first plant and update it to have exact quantity
-    suitablePlant = plants[0];
+  const samplePlant = plants[0];
+  const categoryId = samplePlant.category?.id || samplePlant.categoryId;
+  let suitablePlant = null;
+
+  const createResponse = await adminHelper.post('/plants', {
+    name: `Test Plant ${Date.now()}`,
+    price: samplePlant.price,
+    quantity: quantity,
+    categoryId: categoryId
+  });
+
+  if (createResponse.status === 201 || createResponse.status === 200) {
+    suitablePlant = createResponse.data;
+    this.createdResources.plants.push(suitablePlant.id);
+    console.log(`[Test] Created plant ${suitablePlant.id} with quantity ${quantity}`);
+  } else {
+    // Fallback: update an existing plant if creation fails
+    suitablePlant = plants.find(p => p.quantity === quantity) || samplePlant;
     console.log(`[Test] Updating plant ${suitablePlant.id} to quantity ${quantity}...`);
-    
+
     const updateResponse = await adminHelper.put(`/plants/${suitablePlant.id}`, {
       name: suitablePlant.name,
       price: suitablePlant.price,
       quantity: quantity,
       categoryId: suitablePlant.category?.id || suitablePlant.categoryId
     });
-    
+
     if (updateResponse.status === 200) {
       suitablePlant = updateResponse.data;
       console.log(`[Test] Updated plant ${suitablePlant.id} to quantity ${quantity}`);
     } else {
       throw new Error(`Failed to update plant quantity: ${updateResponse.status} - ${JSON.stringify(updateResponse.data)}`);
+    }
+  }
+
+  const verifyResponse = await adminHelper.get(`/plants/${suitablePlant.id}`);
+  if (verifyResponse.status === 200) {
+    if (verifyResponse.data.quantity !== quantity) {
+      console.log(`[Test] Quantity mismatch after update. Re-applying quantity ${quantity} to plant ${suitablePlant.id}...`);
+      const retryUpdate = await adminHelper.put(`/plants/${suitablePlant.id}`, {
+        name: verifyResponse.data.name,
+        price: verifyResponse.data.price,
+        quantity: quantity,
+        categoryId: verifyResponse.data.category?.id || verifyResponse.data.categoryId
+      });
+
+      if (retryUpdate.status === 200) {
+        suitablePlant = retryUpdate.data;
+      } else {
+        throw new Error(`Failed to re-apply plant quantity: ${retryUpdate.status} - ${JSON.stringify(retryUpdate.data)}`);
+      }
+    } else {
+      suitablePlant = verifyResponse.data;
     }
   }
   

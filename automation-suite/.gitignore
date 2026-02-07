@@ -1,5 +1,7 @@
 # Dependencies
 node_modules/
+allure-results/
+allure-report/
 *.npm
 *.lock
 package-lock.json

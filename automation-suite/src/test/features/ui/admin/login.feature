@@ -1,3 +1,4 @@
+@login
 Feature: Admin Login Functionality
   As an Admin user
   I want to login to the application
